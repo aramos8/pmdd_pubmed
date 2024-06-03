@@ -1,13 +1,13 @@
 # Documentation
 
-This file is intended to keep track of the general plan for this work. In the beginning, the pipeline will consist of a series of separate files, and later, as I get more familiar with working with R and Entrez, I will build the pipeline with an orchestrator or Snakemake. 
+This README is intended to keep track of the general plan for this work. In the beginning, the pipeline will consist of a series of separate files, and later, as I get more familiar with working with R and Entrez, I will build the pipeline with an orchestrator and/or Snakemake. 
 
 However, during these initial stages of this project, I want to make sure I keep track of how I am doing the work
 
 
 ## Plan
 
-### Pul Data from entrez using the command line
+### 1. Pull Data from Pubmed using the command line interface for Entrez
 
 The `pmdd_entrez.sh` script was writen based on instructions provided in the [Entrez Direct: E-utilities on the Unix Command Line](https://www.ncbi.nlm.nih.gov/books/NBK179288/#chapter6.Structured_Data) provided by NCBI. The objective of this script is to collect the desired fields from PubMed in an XML file. 
 
@@ -57,7 +57,11 @@ Thi step was actually much easier than anticipated. Naturally, at the beginning 
 
 ### Model the data in DuckDB
 
+After loading the JSON file, now it is a matter of extracting the relevant information and modelling it in a way that it can serve multiple functions downstream. This table is intended to be a denormalized table, which I will use as the main source of data in downstream analyses. 
 
+DuckDB's `read_json` function did most of the heavy lifting. All that was left for me to do was nest all applicable fields (e.g. keywords, MeSH terms, author details) in an easy to process format. This work resulted in table `entrez_clean` which will now be used downstream in R and with further SQL modelling. 
+
+Depending on how much more SQL I write for this modelling, I may use `dbt` to help me better manage the data transofrmations in this project. 
 
 *NOTE: It may be interesting to use `dbt` here as well to showcase that skillset*
 

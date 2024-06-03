@@ -14,12 +14,24 @@ LEFT JOIN (SELECT pubmed_id, mesh FROM entrez_clean, UNNEST(mesh_terms) AS mesh)
     USING(pubmed_id);
 
 --What keyword is used in most PMDD papers? 
+CREATE OR REPLACE TABLE keyword_papers AS 
 SELECT
     keyword,
     COUNT(DISTINCT(pubmed_id)) AS pubmed_papers
 FROM (SELECT pubmed_id, LOWER(UNNEST(keywords)) AS keyword FROM entrez_clean)
 GROUP BY keyword
 ORDER BY pubmed_papers DESC;
+
+SELECT 
+    *
+FROM (SELECT 
+        pub_date,
+        EXTRACT(YEAR FROM pub_date) AS pub_year,
+        pubmed_id,
+        kw.keywords AS keyword
+    FROM entrez_clean, UNNEST(keywords) AS kw)
+ORDER BY keyword;
+
 
 --What MeSH term is used in most PMDD papers? 
 SELECT
@@ -79,3 +91,32 @@ FROM read_csv(pubmed_ids.csv)
 esearch -db pubmed -query "pmdd OR premenstrual dysphoric disorder OR luteal phase dysphoric disorder OR pmdd [MESH]" |\
 efetch -format xml |\
 xtract -pattern PubmedArticle -element MedlineCitation/PMID > pubmed_ids.csv
+
+
+
+--Papers per year
+SELECT 
+  pub_date,
+  EXTRACT(YEAR FROM pub_date) AS pub_year,
+  pubmed_id,
+FROM entrez_clean;
+
+SELECT 
+  COUNT(DISTINCT(CASE WHEN pub_date IS NOT NULL THEN pubmed_id END)) AS with_date,
+  COUNT(DISTINCT(CASE WHEN pub_date IS NULL THEN pubmed_id END)) AS without_date,
+  COUNT(DISTINCT(pubmed_id)) AS all
+FROM entrez_clean;
+
+
+SELECT 
+    pubmed_id,
+    pub_date,
+    CASE WHEN pub_date IS NULL THEN 1 ELSE 0 END
+FROM entrez_clean
+WHERE pubmed_id IN (10414640, 10732657, 17472544);
+
+--Papers per institution
+SELECT 
+    pubmed_id,
+    author.author_details.author_affiliation
+FROM entrez_clean, UNNEST(author_details) AS author;

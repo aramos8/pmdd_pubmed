@@ -19,7 +19,8 @@ xtract -set Set -rec Publication -pattern PubmedArticle -def "N/A" \
            -sep "-" -pkg sub_date -element Year,Month,Day \
     -block History/PubMedPubDate \
 		-if @PubStatus -equals "accepted" \
-           -sep "-" -pkg pub_date -element Year,Month,Day \
+           -sep "-" -pkg accepted_date -element Year,Month,Day \
+	-block JournalIssue/PubDate -sep "-" -pkg pubdate -element Year,Month,Day \
 	-block MeshHeadingList/MeshHeading/DescriptorName \
 		-if @MajorTopicYN -equals "Y" -pkg major_mesh -wrp major_mesh_term -element DescriptorName \
     -block MeshHeadingList -pkg mesh_terms -wrp mesh_term -element DescriptorName \
