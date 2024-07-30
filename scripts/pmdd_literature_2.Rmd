@@ -9,14 +9,12 @@ output: html_notebook
 
 # Data input
 
-The data used in this analysis was all obtained from PubMed using the command line Entrez tools. The data was obtained in an XML file, which was then converted to JSON using [yq](https://github.com/mikefarah/yq), and then loaded onto a local database using DuckDB (`pmdd.db`). 
+The data used in this analysis was all obtained from PubMed using the command line Entrez tools. The data was obtained in an XML file, which was then converted to JSON using [yq](https://github.com/mikefarah/yq), and then loaded onto a local database using [DuckDB](https://duckdb.org/docs/api/r) (`pmdd.db`). 
 
-This notebook builds an in-memory database that allows for the analysis of the PMDD PubMed data using both SQL and R data frames as needed. 
 
 # Analysis and visualization
 
-This notebook will use  a combination of `DuckDB` and `tidyverse` packages to process the data. First, we establish a connection to the `pmdd.db` database with the data imported from PubMed. 
-
+This notebook will use a combination of `DuckDB` and `tidyverse` packages to process the data. First, let's establish a connection to the `pmdd.db` database with the data imported from PubMed using `pmdd_entrez.sh`. 
 
 ```{r}
 library(duckdb)
@@ -24,8 +22,11 @@ library(tidyverse)
 library(forcats)
 
 
-# Establish an in-memory database. This database will not persist outside of this notebook. 
-con <- dbConnect(duckdb(), dbdir = "pmdd.db")
+# Connect to DuckDB database
+database_path <- file.path("/Users","anaelizondo-ramos", "Documents", "Projects", "pmdd", "pmdd_pubmed", "data", "pmdd.db")
+
+con <- dbConnect(duckdb(), dbdir = database_path)
+on.exit(dbDisconnect(con), add = TRUE)
 # or
 #con <- dbConnect(duckdb(), dbdir = ":memory:")
 
@@ -34,44 +35,26 @@ con <- dbConnect(duckdb(), dbdir = "pmdd.db")
 ```
 
 
-
- 
-
-```{r}
-# Let's now confirm that the table is in our database
-db_tables <- dbGetQuery(con, 
-"SHOW tables")
-print(db_tables)
-```
-
+Once connected to the database, let's load the "entrez_clean" table into a dataframe. 
 ```{r}
 entrez_clean <- dbGetQuery(con, "SELECT * FROM entrez_clean;")
-
 ```
 
 
-Now that the data is loaded we can start exploring it by further querying and building visualizations. Note that the table still has several nested fields, so let's continue using SQL to model the initial table into several subsequent tables to start getting some answers. To do so, let's first frame some of the questions we would like to answer in this notebook.
+With the data loaded we can start exploring it by further querying and building visualizations. Before jumping into the data, let's first frame some of the questions I would like to answer in this notebook.
 
 - How many PMDD articles were published in PubMed each year? 
-- How many institutions have published PMDD articles?
-- Which institution has been the most prolific in terms of PMDD publications?
-- Who are the top 20 authors in the PMDD field (based on publication count)?
-- What proportion of PMDD articles came from a Canadian institution? 
 - How many keywords are used to describe PMDD articles on PubMed? 
   - What is the percentage of articles that use keywords? 
-  - Which are the top 50 keywords used in PMDD articles on PubMed? 
+  - Which are the top 30 keywords used in PMDD articles on PubMed? 
 - How many MeSH terms are used to describe PMDD articles on PubMed? 
   - What is the percentage of articles that use MeSH terms? 
-  - Which are the top 50 MeSH terms used in PMDD articles on PubMed? 
-  
+  - Which are the top 30 MeSH terms used in PMDD articles on PubMed? 
+- How many institutions have published PMDD articles?
+- Which institution has been the most prolific in terms of PMDD publications?
+- Who are the top 30 authors in the PMDD field (based on publication count)?
+- What proportion of PMDD articles came from a Canadian institution? 
 
-
-```{r}
-
-describe_table <- dbGetQuery(con,
-"DESCRIBE entrez_clean")
-
-```
 
 
 ## How many PMDD articles were published in PubMed each year? 
@@ -79,31 +62,36 @@ describe_table <- dbGetQuery(con,
 We will use the publication date, represented by the `pub_date` field in the `entrez_clean` table just added to our database. 
 
 ```{r}
-
-articles_year <-  entrez_clean %>% 
+entrez_clean %>% 
   summarize(with_dates = n_distinct(case_when(is.na(accepted_date) == FALSE  ~ pubmed_id)),
             without_dates = n_distinct(case_when(is.na(accepted_date) ~ pubmed_id)),
             with_pubication_year = n_distinct(case_when(is.na(publication_year) == FALSE  ~ pubmed_id)),
             all = n_distinct(pubmed_id)
             )
-
 ```
 
-Out of the 1,338 PMDD publications in PubMed, only ~41% provide an accepted date (date when the publication was accepted by the publisher). For the publications missing this field, we can pull the "PubDate" field from Entrez, which corresponds to the date when the article became available in the journal. Therefore, we can create a new field, `publication_year`, which will use the year from the accepted_date, and the year from PubDate for the records where the accepted_date is not available. By doing so, we get 99% coverage.
+Out of the 1,352 PMDD publications in PubMed until the end of July 2024, only ~42% provide an accepted date (date when the publication was accepted by the publisher). For the publications missing this field, we can pull the "PubDate" field from Entrez, which corresponds to the date when the article became available in the journal. Therefore, we can create a new field, `publication_year`, which will use the year from the accepted_date, and the year from PubDate for the records where the accepted_date is not available. By doing so, we get 99% coverage.
 
+Now that we understand the data a bit better, let's calculate the number of publications produced each year using the `publication_year` field. This calculation is stored in the `n_articles_year` dataframe. 
 
 ```{r}
 
+## Get number of publications per year
 n_articles_year <- entrez_clean |>
   group_by(publication_year) |>
   summarize(articles = n_distinct(pubmed_id))
 
-```
-
-```{r}
-ggplot(data = n_articles_year) +
+## Let's plot the publications per year
+ggplot(data = filter(n_articles_year, !is.na(publication_year))) +
   geom_col(mapping = aes(x = publication_year, y = articles))
 ```
+
+Looking at the number of studies focused on PMDD that have been published over the years, we can see that the field started to gain traction by the end of the 80s. Coincidentally,diagnosis criteria for late luteal phase dysphoric disorder (LLPDD) was included in the DSM-III in 1987 (Endicott, 2000). The name premenstrual dysphoric disorder (PMDD) was coined in the DSM-IV in 1993 after the diagnostic criterion and newer evidence were further analyzed. However, at this point PMDD was included under the "Conditions for further study" diagnostic class. It wasn't until 2013, in the DSM-5 edition that PMDD was included under the "depressive disorder" diagnostic class. 
+
+Through all this time PMDD was still only recognized as a psychological condition, and it remained excluded from the International Classification of Diseases, a standardized description of diseases and physiological conditions published by the WHO. In 2019, the ICD-11 edition finally included PMDD as a physiological condition. 
+
+It is likely that having proper diagnosis criteria and a validation of PMDD as both a psychological and physiological condition encouraged scientists to explore this condition further, which could explain the increasing number of publications per year up until the early 2000s and the second spike in publications from 2020 onward. Between the years 2000 and 2020, an average of 43 ± 6 publications were published per year. However, after 2020 there was a new spike in publications per year, reaching 79 and 87 publications in 2022 and 2023, respectively. 
+
 ```{r}
 n_articles_year %>% 
   filter(publication_year >= 2000 & publication_year <= 2019) %>% 
@@ -113,30 +101,15 @@ n_articles_year %>%
             stdev = sd(articles))
 ```
 
-When we look at the number of studies focused on PMDD that have been published over the years, we can see that the field started to gain traction by the end of the 80s. Coincidentally,diagnosis criteria for late luteal phase dysphoric disorder (LLPDD) was included in the DSM-III in 1987 (Endicott, 2000). The name premenstrual dysphoric disorder (PMDD) was coined in the DSM-IV in 1993 after the diagnostic criterion and newer evidence were further analyzed. However, at this point PMDD was included under the "Conditions for further study" diagnostic class. It wasn't until 2013, in the DSM-5 edition that PMDD was included under the "depressive disorder" diagnostic class. 
 
-Through all this time PMDD was still only recognized as a psychological condition, and it remained excluded from the International Classification of Diseases, a standardized description of diseases and physiological conditions published by the WHO. In 2019, the ICD-11 edition finally included PMDD as a physiological condition. 
+## How many keywords are used to describe PMDD articles on PubMed? 
 
-It is likely that having proper diagnosis criteria and a validation of PMDD as both a psychological and physiological condition encouraged scientists to explore this condition further, which could explain the increasing number of publications per year up until the early 2000s and the second spike in publications from 2020 onward. Between the years 2000 and 2020, an average of 43 publications were published per year. However, after 2020 there was a new spike in publications per year, reaching 79 and 87 publications in 2022 and 2023, respectively. 
+Keywords are included in the `entrez_clean` table in a nested column, which means we need to unnest the column to answer how many keywords are used in PMDD publications. Additionally, it is common to find both a singular and plural version (e.g. "adolescent" and "adolescents") of the same keywords, as well as different capitalization (e.g. "pmdd" and "PMDD"). Therefore, before doing calculations based on keywords we need to do a bit of cleaning of the data. 
 
-
-
-
-## KEYWORDS
-```{r}
-# Calculate the number of publications that use a keyword
-entrez_clean %>% 
-  unnest(keywords) %>% 
-  summarize(all_publications = n_distinct(entrez_clean$pubmed_id, na.rm = FALSE),
-            with_kws_pubs_perc = round(n_distinct(pubmed_id, na.rm = FALSE)/all_publications*100, digits = 2),
-            no_kws_pubs_perc = 100 - with_kws_pubs_perc
-            )
-```
-
+First we create a staging dataframe, `stg_kws`, where capitalization and plural/singular versions are consolidated. 
 
 ```{r}
-
-# First we get all the keywords and create a new column where we remove the "s" at the end of each keyword
+# First we clean the keyword terms to consolidate singular/plural versions and capitalization versions.
 stg_kws <- entrez_clean %>% 
   unnest(keywords) %>% 
   transmute(keywords,
@@ -149,12 +122,18 @@ stg_kws <- entrez_clean %>%
             singulars = stringr::str_replace_all(lower_kw, c("[^[:alnum:]]$" = "",  "s$" = "", "(\\(\\d*)" = "\\1\\)" ))
             )
 
+```
 
+With the keywords clean now, we start doing calculations for each keyword, like the number of publications using the keyword and the date when the keyword was first used. As mentioned above, the term PMDD was officially introduced into the DSM-IV in 1993, and it was included in the ICD-11 in 2019. Therefore, it would be interesting to see which keywords are most used before 2019, and which keywords introduced on or after 2019 are most used. Therefore, the number of publications using the keyword before or after 2019 is calculated as well. 
+
+  *NOTE: To ensure consistency, calculations are done on the singular and lowercase version of these keywords.*
+
+```{r}
 # Now, we can use stg_kws to decide which term to use for the keyword.
 # If the singular form of the keyword is present in the lower-case version of the original keyword, then we use the singular form. If the singular version is not present in the original keyword then we keep the original. 
 keywords <- entrez_clean %>%
   unnest(keywords) %>%
-  left_join(stg_kws) %>%
+  left_join(stg_kws, relationship = "many-to-many") %>%
   group_by(keyword = case_when(
     singulars %in% stg_kws$lower_kw ~ singulars, 
     .default = lower_kw)) %>% 
@@ -165,96 +144,109 @@ keywords <- entrez_clean %>%
             ) %>% 
   arrange(desc(publications))
 
+```
 
+We find 1,236 unique keywords used in PMDD publications in PubMed, of which 609 (49%) were introduced before 2019, and 627 (51%) were introduced on 2019 or after. 
 
+### Which are the 30 most used keywords before 2019? 
 
-# Plot the number of publications for the top 20 keywords used for the first time before 2019
+After plotting the `keywords` dataframe we see the top 30 keywords used in PMDD publications before 2019 that "PMDD" and "PMS" are the two most used keywords, which is not surprising given the focus of these publications is PMDD. It is also very telling of the strong focus on the psychological aspect of PMDD, as terms like "anxiety", "mood", "bipolar disorder", "cognition", and other terms related to depression are among the top 30 used keywords. There is also a strong focus on the effect on hormones, with progesterone and allopregnanolone being the two most used (31 and 30 publications respectively), followed by estrogen and estradiol (15 and 11 publications respectively). There are also 9 publications using the keyword GABA, a neurotransmitter known to be strongly associated to hormones. `<- Explain this shit better and add a reference`
 
+```{r}
+# Plot the number of publications for the top 30 keywords used for the first time before 2019
 ggplot(data = head(filter(keywords, first_date < 2019), n=30), aes(x = fct_reorder(keyword, publications), y = publications) ) +
   geom_col() +
   coord_flip() + scale_y_continuous(name="Number of publications") +
   scale_x_discrete(name="Keyword")
 
 ```
-As mentioned above, the term PMDD was officially introduced into the DSM-IV in 1993, and it was included in the ICD-11 in 2019. Therefore, it would be interesting to see which keywords are most used before 2019, and which keywords introduced on or after 2019 are most used. 
-
-In the graph above we see the top 30 keywords used in PMDD publications before 2019 that "PMDD" and "PMS" are the two most used keywords, which is not surprising given the focus of these publications is PMDD. It is also very telling of the strong focus on the psychological aspect of PMDD, as terms like "anxiety", "mood", "bipolar disorder", "cognition", and other terms related to depression are among the top 30 used keywords. There is also a strong focus on the effect on hormones, with progesterone and allopregnanolone being the two most used (31 and 30 publications respectively), followed by estrogen and estradiol (15 and 11 publications respectively). There are also 9 publications using the keyword GABA, a neurotransmitter known to be strongly associated to hormones. `<- Explain this shit better and add a reference`
 
 
+### Which keywords were introduced on 2019 or after? 
+
+Since the introduction of PMDD into the ICD-11 took place in 2019, I was curious to see which new keywords started to be used to describe the work done in these studies in 2019 or after. A new subset of keywords was identified, keywords that had their first appearance in PMDD articles on 2019 or later. A total of 627 new keywords were identified, with the 30 most used keywords (by publication count) shown in the graph above). 
 
 ```{r}
 # Plot the number of publications for the top 20 keywords used for the first time on 2019 or after
-
 ggplot(data = head(filter(keywords, first_date >= 2019), n=30), aes(x = fct_reorder(keyword, publications), y = publications) ) +
   geom_col() +
   coord_flip() + scale_y_continuous(name="Number of publications") +
   scale_x_discrete(name="Keyword")
 ```
 
-Since the introduction of PMDD into the ICD-11 took place in 2019, I was curious to see which new keywords started to be used to describe the work done in these studies. A new subset of keywords was identified, keywords that had their first appearance in PMDD articles on 2019 or later. A total of 601 new keywords were identified, with the 30 most used keywords (by publication count) shown in the graph above). 
-
 While the number of publications using these new keywords are not substantial (ranging from 1 - 6 publications per new keyword), it is interesting to see the introduction of more terms related to brain and mental health, including "eating disorder", "suicidality", "trauma", "generalized anxiety disorder" and "autism". Interestingly, we can start to identify new terms related to the biochemistry of PMDD. Terms such as "laccase inhibitor", "inflammation", "neurotransmitter", "molecular docking", and "HPA axis" suggest that PMDD research is starting to broaden towards a more biochemical/physiological focus. 
 
-*Notice how PMDD and PMS do not appear in the graph above: this is because these keywords were first used before 2019, so while they are not shown in the graph above it does not mean that these terms were not used in publications that came out on or after 2019, simply that they first appeared before the currof time used to generate the graph above.*
+*Notice how PMDD and PMS do not appear in the graph above: this is because these keywords were first used before 2019, so while they are not shown in the graph above it does not mean that these terms were not used in publications that came out on or after 2019, simply that they first appeared before the cutoff time used to generate the graph above.*
 
-I was then curious to see how keywords utilization changed over time. To do this, I looked at the number of publications using each keyword over time, regardless of when the keyword was first used. The following two graphs show the number of publications for each keyword when the publication date was before 2019, or on or after 2019. I was surprised to see that PMDD and PMS are both used in more publications after 2019. PMDD was used as a keyword in 108 publications before 2019 and 172 publications on or after 2019. Similarly, PMS appeared in 70 publications before 2019 and 101 after. 
+### How does keyword utilization change over time?
+
+I was then curious to see how keywords utilization changed over time. To do this, I looked at the number of publications using each keyword over time, regardless of when the keyword was first used. The following two graphs show the number of publications for each keyword when the publication date was before 2019, or on or after 2019. I was surprised to see that PMDD and PMS are both used in more publications after 2019. PMDD was used as a keyword in 108 publications before 2019 and 181 publications on or after 2019. Similarly, PMS appeared in 70 publications before 2019 and 106 after. 
 
 
 ```{r}
 # Plot the number of publications before 2019 for the top 20 keywords
-
 ggplot(data = head(keywords, n=30), aes(x = fct_reorder(keyword, pubs_before_2019), y = pubs_before_2019) ) +
   geom_col() +
   coord_flip() + scale_y_continuous(name="Number of publications") +
-  scale_x_discrete(name="Keyword")
+  scale_x_discrete(name="Keyword") +
+  ggtitle("# of Publications before 2019")
 
 ```
 
 ```{r}
 # Plot the number of publications on or after 2019 for the top 20 keywords
-
 ggplot(data = head(keywords, n=30), aes(x = fct_reorder(keyword, pubs_after_2019), y = pubs_after_2019) ) +
   geom_col() +
   coord_flip() + scale_y_continuous(name="Number of publications") +
-  scale_x_discrete(name="Keyword")
+  scale_x_discrete(name="Keyword") +
+  ggtitle("# of Publications after 2019")
 
 ```
 
+Seeing that both "PMDD" and "PMS" were used in more publications on or after 2019 than in the ~20 years before, I was curious to see with more granularity how these terms were used over the years. 
 
 ```{r}
 # How did the use of the term PMDD change over time? 
 entrez_clean %>%
   unnest(keywords) %>%
-  left_join(stg_kws) %>%
+  left_join(stg_kws, relationship = "many-to-many") %>%
   filter(lower_kw %in% c("pmdd","pms")) %>% 
   #filter(lower_kw %in% c("pmdd","pms", "progesterone", "allopregnanolone", "estrogen", "estradiol", "gaba")) %>% 
   group_by(lower_kw, publication_year) %>% 
   summarize(., publications = n_distinct(pubmed_id)
             ) %>% 
   ggplot(., aes(x = publication_year, y = publications, fill = toupper(lower_kw))) + geom_col(position = position_dodge()) + xlab("Publication Year") + ylab("Publications using PMDD as keyword") + scale_fill_discrete(name = "Keyword")
-
-
 ```
 The graph above shows the use of PMDD and PMS as keywords in the literature over the years. Even though the terms were first used in the late 90s, they were seldom used until ~2008, when these terms started to be used more commonly. At that point we also can see that the term PMDD was used more predominantly than PMS, likely as the distinction between PMDD and PMS started becoming more widely accepted among researchers. 
-
 
 
 ```{r}
 # Showing the number of publications and keywords per year.
 entrez_clean %>%
   unnest(keywords) %>%
-  left_join(stg_kws) %>%
+  left_join(stg_kws, relationship = "many-to-many") %>%
   group_by(publication_year) %>% 
   summarize(., 
             publications = n_distinct(pubmed_id), 
             keyword_c = n_distinct(lower_kw)
             ) %>% 
-  ggplot(., aes(x = publication_year, y = publications)) + geom_col() + xlab("Publication Year") + ylab("Publications using PMDD as keyword") + scale_fill_discrete(name = "Keyword") + geom_line(mapping = aes(y= keyword_c/2)) + scale_y_continuous(sec.axis = sec_axis(~ . *2, name = "Keywords used in PMDD publications")) 
-
+  ggplot(., aes(x = publication_year, y = publications)) + geom_col() + xlab("Publication Year") + ylab("Publications using PMDD as keyword") + scale_fill_discrete(name = "Keyword") + geom_line(mapping = aes(y= keyword_c/3)) + scale_y_continuous(sec.axis = sec_axis(~ . *3, name = "Keywords used in PMDD publications")) 
 
 ```
 
 
+### What is the percentage of articles that use keywords? 
+
+Out of the 1352 publications related to PMDD until the end of July 2024, 34.24% provide keywords in PubMed. 
+```{r}
+# Calculate the number of publications that use a keyword
+entrez_clean %>% 
+  unnest(keywords) %>% 
+  summarize(all_publications = n_distinct(entrez_clean$pubmed_id, na.rm = FALSE),
+            with_kws_pubs_perc = round(n_distinct(pubmed_id, na.rm = FALSE)/all_publications*100, digits = 2),
+            no_kws_pubs_perc = 100 - with_kws_pubs_perc
+            )
+```
 
 
 ## MESH TERMS
