@@ -9,7 +9,7 @@ This README is intended to keep track of the general plan for this work. During 
 
 The `pmdd_entrez.sh` script is writen based on instructions provided in the [Entrez Direct: E-utilities on the Unix Command Line](https://www.ncbi.nlm.nih.gov/books/NBK179288/#chapter6.Structured_Data) provided by NCBI. The objective of this script is to collect the desired fields from PubMed in an XML file. 
 
-To pull the data from NCBI, simply run the following command.  
+To pull the data from NCBI, go to the `data` directory and run the following command.  
 ```
 bash pmdd_entrez.sh
 ```
@@ -45,7 +45,7 @@ Homebrew installation is recommended, so I used:
 brew install yq
 ```
 
-Once installed, run the following command to cary out the converstion: 
+Once installed, run the following command in the `data` directory to cary out the conversion: 
 ```
 yq -p=xml -o=json pmdd_entrez.xml > pmdd_entrez.json
 ```
