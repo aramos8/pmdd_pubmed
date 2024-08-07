@@ -1,0 +1,485 @@
+---
+title: "Review of the current state of PMDD scientific literature in Pubmed"
+author: "Ana Ramos"
+output:
+  html_document:
+    df_print: paged
+    theme: journal
+    toc: true
+    toc_float:
+      collapsed: true
+---
+
+```{r setup, include = FALSE}
+# Set working directory
+knitr::opts_knit$set(root.dir = '~/Documents/Projects/pmdd/pmdd_pubmed')
+```
+
+# Introduction
+
+PMDD (premenstrual dysphoric disorder) is condition affecting menstruating people, both from a psychological perspective and physical perspective. PMDD is characterized by a combination of mood and physical symptoms that occur during the luteal phase of the menstrual cycle, including depression, irritability, joint pain, breast pain, cravings, lethargy, and poor concentration, among others. The condition has had a rather turbulent path to being recognized, with some controversial involvement from big pharma (more details `REFERENCE`). The condition was first introduced into the DSM-III (Diagnostic and Statistical Manual of Mental Disorders, third edition) in 1987 under the name late luteal phase dysphoric disorder (LLPDD); however, after reassessing the symptoms reported by patients the diagnosis criteria was revised and the name premenstrual dysphoric disorder was coined in the DSM-IV in 1993. At this point, the condition was classified as a "condition for further study", and in 2012 it was revised in the DSM-5 edition under the class "depressive disorder". It wasn't until 2019 that PMDD was added to the ICD-11 under code [GA34.41](https://icd.who.int/browse/2024-01/mms/en#1526774088), granting the condition full medical recognition under the WHO. 
+
+As a condition that encompasses both mental heath and the menstrual cycle, PMDD is a disorder that is not discussed widely, and people with PMDD may find a difficult time finding accurate information to educate themselves about the symptoms they may experience and their treatment options. In addition, given its relatively recent introduction to the ICD, the condition is not widely known among clinicians and physicians, so patients are commonly tasked with the responsibility to source literature to share with them to support their treatment, and often diagnosis.
+
+To facilitate visibility to PMDD scientific literature, this notebook conducts and exploratory data analysis of scientific literature on PMDD available in [PubMed](https://pubmed.ncbi.nlm.nih.gov/?term=pmdd+OR+premenstrual+dysphoric+disorder+OR+pmdd+%5BMESH%5D) using the search prompt `pmdd OR premenstrual dysphoric disorder OR pmdd [MESH]`. This notebook includes all the publications available until July 30, 2024 3:00 pm ET, with the goal of identifying insights and observations that can eventually be reported in a continuously updated dashboard. In addition, this notebook will explore how the scientific literature is cited across PMDD publications, to support the development of a web-app providing a visual map of the scientific literature supporting PMDD studies with the objective of promoting advocacy for research funding and facilitating collaboration among scientists. 
+
+
+# Data input
+
+The data used in this analysis was all obtained from PubMed using [Entrez Direct: E-utilities on the Unix Command Line](https://www.ncbi.nlm.nih.gov/books/NBK179288/#chapter6.Structured_Data) with the search prompt `pmdd OR premenstrual dysphoric disorder OR pmdd [MESH]`. The data was obtained in an XML file, which was then converted to JSON using [yq](https://github.com/mikefarah/yq), and then loaded onto a local database using [DuckDB](https://duckdb.org/docs/api/r) (`pmdd.db`).
+
+This notebook will use a combination of [DuckDB](https://duckdb.org/docs/api/r) and [tidyverse](https://www.tidyverse.org) packages to process the data. to achieve that, let's first establish a connection to the `pmdd.db` database with the data imported from PubMed using `pmdd_entrez.sh`.Once connected to the database, the "entrez_clean" table including the modeled data obtained from Entrez is loaded into an R data frame. 
+
+```{r}
+# Install packges
+library(duckdb)
+library(tidyverse)
+library(dplyr)
+library(forcats)
+library(conflicted)
+
+conflicts_prefer(dplyr::filter)
+
+# Connect to DuckDB database
+database_path <- file.path("data", "pmdd.db")
+
+con <- dbConnect(duckdb(), dbdir = database_path)
+
+# Ensure databse connection is closed when closing this notebook
+#on.exit(dbDisconnect(con), add = TRUE)
+
+# or
+#con <- dbConnect(duckdb(), dbdir = ":memory:")
+
+# Get table from database and store in dataframe
+entrez_clean <- dbGetQuery(con, "SELECT * FROM entrez_clean;")
+
+# Close connection to database
+duckdb_shutdown(duckdb())
+```
+
+
+# Analysis and visualization
+
+The data obtained from PubMed includes the unique identifiers of a publication (e.g. PubMed ID, Pubmed Central ID, doi), title, author details (e.g. names, affiliation), article abstract, keywords, [MeSH](https://www.ncbi.nlm.nih.gov/mesh/) (Medical Subject Headings, established by the National Library of Medicine) terms and references. 
+
+
+## How many PMDD articles were published in PubMed each year?
+
+Multiple date fields are available in the raw data obtained from PubMed, including `accepted_date` and `pubdate`. When exploring the data, only 564 (~42%) out of the 1352 publications have a date in the `accepted_date` field. Therefore, the field `publication_year` was included in the SQL model in DuckDB, which extracts the year field from `pubdate` in the records where `accepted_date` is empty, but uses the year from `accepted_date` when available. This results in 1349 records out of 1352 reporting a publication year. 
+
+```{r}
+entrez_clean %>% 
+  summarize(with_accepted_dates = n_distinct(case_when(is.na(accepted_date) == FALSE  ~ pubmed_id)),
+            with_pubication_year = n_distinct(case_when(is.na(publication_year) == FALSE  ~ pubmed_id)),
+            all = n_distinct(pubmed_id)
+            )
+```
+Therefore, the number of publications per year can be calculated by counting the unique PubMed IDs for each `publication_year`, stored in the `n_articles_year` data frame. 
+
+```{r}
+## Get number of publications per year
+n_articles_year <- entrez_clean |>
+  group_by(publication_year) |>
+  summarize(articles = n_distinct(pubmed_id))
+
+## Let's plot the publications per year
+ggplot(data = filter(n_articles_year, !is.na(publication_year))) +
+  geom_col(mapping = aes(x = publication_year, y = articles), fill = "#0072b2") + 
+  xlab("Publication Year") +
+  ylab("Number of publications") 
+```
+
+The plot above confirms that the field started to gain traction by the end of the 80s, which was expected as the diagnosis criteria for late luteal phase dysphoric disorder (LLPDD) was included in the DSM-III in 1987 ([Endicott, 2000](https://www.psychiatrist.com/pcc/history-evolution-diagnosis-premenstrual-dysphoric/)). As discussed in the introduction, PMDD was formalized as a "depressive disorder" in 2013 in the DSM-5 and included in the ICD-11 in 2019, which could explain the sudden increase in PMDD publications per year in 2022 and 2023. 
+
+It is likely that having proper diagnosis criteria and a validation of PMDD as both a psychological and physiological condition encouraged scientists to explore this condition further, which could explain the increasing number of publications per year up until the early 2000s and the second spike in publications from 2020 onward. Between the years 2000 and 2020, an average of 42 ± 5 publications were published per year. However, after 2020 there was a new spike in publications per year, reaching 79 and 87 publications in 2022 and 2023, respectively.
+
+```{r}
+n_articles_year %>% 
+  filter(publication_year >= 2000 & publication_year <= 2019) %>% 
+  #filter(publication_year >= 2020) %>% 
+  #filter(publication_year >= 2010 & publication_year <= 2019) %>% 
+  summarize(avg = mean(articles),
+            stdev = sd(articles))
+```
+
+## How many keywords are used to describe PMDD articles on PubMed?
+
+Keywords are provided by authors when they submit their article for consideration to a journal. Therefore, they could serve as a good indicator of the kind of work reported on a scientific paper. Keywords are included in the `entrez_clean` table in a nested column named **keywords**, which must first be unnested to calculate how many keywords are used in PMDD publications. Additionally, it is common to find both a singular and plural version (e.g. "adolescent" and "adolescents") of the same keywords, as well as different capitalization (e.g. "pmdd" and "PMDD"). Therefore, before doing calculations based on keywords it is important to do a bit of cleaning of the data.
+
+First a staging data frame is used, `stg_kws`, where capitalization and plural/singular versions are consolidated.
+
+```{r}
+# First we clean the keyword terms to consolidate singular/plural versions and capitalization versions.
+stg_kws <- entrez_clean %>% 
+  unnest(keywords) %>% 
+  transmute(keywords,
+            lower_kw = case_when(
+            grepl("premenstrual syndrome", keywords, ignore.case = TRUE) ~ "pms",  
+            grepl("PMDD/PMS|PMS/P", keywords, ignore.case = TRUE) ~ "pms/pmdd",  
+            grepl("pre-menstrual dysphoric disorder|premenstrual dysphoric disorder|premenstrual dysphoria disorder", keywords, ignore.case = TRUE) ~ "pmdd",
+            grepl("-", keywords) ~ keywords,
+            .default = tolower(keywords)),
+            singulars = stringr::str_replace_all(lower_kw, c("[^[:alnum:]]$" = "",  "s$" = "", "(\\(\\d*)" = "\\1\\)" ))
+            )
+
+```
+
+With the keywords clean now, the **keywords** field can be used to run calculations for each keyword, like the number of publications using the keyword and the date when the keyword was first used. As mentioned above, the term PMDD was officially introduced into the DSM-IV in 1993, and it was included in the ICD-11 in 2019. Therefore, it would be interesting to see which keywords are most used before 2019, and which keywords introduced on or after 2019 are most used. Therefore, the number of publications using the keyword before or after 2019 is calculated as well.
+
+*NOTE: To ensure consistency, calculations are done on the singular and lowercase version of these keywords.*
+
+```{r}
+# Now, we can use stg_kws to decide which term to use for the keyword.
+# If the singular form of the keyword is present in the lower-case version of the original keyword, then we use the singular form. If the singular version is not present in the original keyword then we keep the original. 
+keywords <- entrez_clean %>%
+  unnest(keywords) %>%
+  left_join(stg_kws, relationship = "many-to-many") %>%
+  group_by(keyword = case_when(
+    singulars %in% stg_kws$lower_kw ~ singulars, 
+    .default = lower_kw)) %>% 
+  summarize(publications = n_distinct(pubmed_id),
+            first_date = min(publication_year),
+            pubs_before_2019 = n_distinct(case_when(publication_year < 2019 ~ as.character(pubmed_id), .default = NA), na.rm = TRUE),
+            pubs_after_2019 = n_distinct(case_when(publication_year >= 2019 ~ as.character(pubmed_id), .default = NA), na.rm = TRUE)
+            ) %>% 
+  arrange(desc(publications))
+```
+
+Up until the end of July 2024, a total of 1,236 unique keywords have been used in PMDD publications in PubMed, of which 609 (49%) were introduced before 2019, and 627 (51%) were introduced on 2019 or after. The use of more keywords after 2019 may be a consequence of a broader abundance of fields researching PMDD with the introduction of the condition to the ICD-11. To further explore this idea, the following sections look intowhich keywords were more predominantly used before and after 2019, as well as which keywords were introduced on or after 2019. 
+
+```{r}
+print(keywords %>% 
+  summarize(keywords = n_distinct(keyword, na.rm = TRUE),
+            before_2019 = n_distinct(case_when(first_date < 2019 ~ keyword), na.rm = TRUE),
+            after_2019 = n_distinct(case_when(first_date >= 2019 ~ keyword), na.rm = TRUE)
+                                     )
+)
+```
+
+
+
+### Which are the 30 most used keywords before 2019?
+
+Looking at the top 30 keywords used in publications before 2019, "PMDD" and "PMS" are the two most used keywords, which is not surprising given the focus of these publications is PMDD. However, exploring the remaining keywords in this list reveal a strong focus in the psychological aspect of PMDD, as terms like "anxiety", "mood", "bipolar disorder", "cognition", and other terms related to depression are among the top 30 used keywords. There is also a strong focus on the effect on hormones, with progesterone and allopregnanolone being the two most used (31 and 30 publications respectively), followed by estrogen and estradiol (15 and 11 publications respectively). There are also 9 publications using the keyword GABA, a neurotransmitter known to be strongly associated to hormones. 
+
+```{r}
+# Plot the number of publications for the top 30 keywords used for the first time before 2019
+ggplot(data = head(filter(keywords, first_date < 2019), n=30), aes(x = fct_reorder(keyword, publications), y = publications) ) +
+  geom_col(fill = "#0072b2") +
+  coord_flip() + scale_y_continuous(name="Number of publications") +
+  scale_x_discrete(name="Keyword")
+
+```
+
+### Which keywords were introduced on 2019 or after?
+
+A new subset of keywords was identified, keywords that had their first appearance in PMDD articles on 2019 or later. A total of 627 new keywords were identified, with the 30 most used keywords (by publication count) shown in the graph below.
+
+```{r}
+# Plot the number of publications for the top 30 keywords used for the first time on 2019 or after
+ggplot(data = head(filter(keywords, first_date >= 2019), n=30), aes(x = fct_reorder(keyword, publications), y = publications) ) +
+  geom_col(fill = "#0072b2") +
+  coord_flip() + scale_y_continuous(name="Number of publications") +
+  scale_x_discrete(name="Keyword")
+```
+
+While the number of publications using these new keywords are not substantial (ranging from 1 - 6 publications per new keyword), it is interesting to see the introduction of more terms related to mental health, including "eating disorder", "suicidality", "trauma", "generalized anxiety disorder" and "autism". Interestingly,new terms related to the biochemistry of PMDD appear for the first time on or after 2019,including "laccase inhibitor", "inflammation", "neurotransmitter", "molecular docking", and "HPA axis", suggesting that PMDD research is starting to broaden towards a more biochemical/physiological focus.
+
+*Notice how PMDD and PMS do not appear in the graph above: this is because these keywords were first used before 2019, so while they are not shown in the graph above it does not mean that these terms were not used in publications that came out on or after 2019, simply that they first appeared before the cutoff time used to generate the graph above.*
+
+### How does keyword utilization change over time?
+
+Since there were big changes to the keyword selection before and after 2019, it would be interesting to explore whether keyword utilization changes over time. The following two graphs show the number of publications for each keyword when the publication date was before 2019, or on or after 2019. Interestingly, "PMDD" and "PMS" are both used in more publications after 2019 than in 1997 to 2018. The keyword "PMDD" was used as a keyword in 108 publications before 2019 and 181 publications on or after 2019. Similarly, "PMS" appeared in 70 publications before 2019 and 106 after.
+
+```{r}
+# Plot the number of publications before 2019 for the top 30 keywords
+ggplot(data = head(keywords, n=30), aes(x = fct_reorder(keyword, pubs_before_2019), y = pubs_before_2019) ) +
+  geom_col(fill = "#0072b2") +
+  coord_flip() + scale_y_continuous(name="Number of publications") +
+  scale_x_discrete(name="Keyword") +
+  ggtitle("# of Publications before 2019")
+
+```
+
+```{r}
+# Plot the number of publications on or after 2019 for the top 30 keywords
+ggplot(data = head(keywords, n=30), aes(x = fct_reorder(keyword, pubs_after_2019), y = pubs_after_2019) ) +
+  geom_col(fill = "#0072b2") +
+  coord_flip() + scale_y_continuous(name="Number of publications") +
+  scale_x_discrete(name="Keyword") +
+  ggtitle("# of Publications after 2019")
+
+```
+
+Seeing that both "PMDD" and "PMS" were used in more publications on or after 2019 than in the \~20 years before, the following plot explores how the use of these keywords changed over time in a more granular way, exploring the number of publications for each keyword each month.
+
+```{r}
+# How did the use of the term PMDD change over time? 
+entrez_clean %>%
+  unnest(keywords) %>%
+  left_join(stg_kws, relationship = "many-to-many") %>%
+  filter(lower_kw %in% c("pmdd","pms")) %>% 
+  #filter(lower_kw %in% c("pmdd","pms", "progesterone", "allopregnanolone", "estrogen", "estradiol", "gaba")) %>% 
+  group_by(lower_kw, publication_year) %>% 
+  summarize(., publications = n_distinct(pubmed_id)
+            ) %>% 
+  ggplot(., aes(x = publication_year, y = publications, fill = toupper(lower_kw))) + geom_col(position = position_dodge()) + xlab("Publication Year") + ylab("Publications using PMDD as keyword") + scale_fill_discrete(name = "Keyword")
+```
+
+Even though the terms were first used in the late 90s, they were seldom used until \~2008, when these terms started to be used more commonly. At that point, the term "PMDD" was used more predominantly than "PMS", likely as the distinction between PMDD and PMS started becoming more widely accepted among researchers.
+
+Lastly, the number of keywords used in PMDD publications each year can be shown in relation to the number of publications released each year, as shown in the graph below with the red line (keyword count) and blue bars (publication count).
+
+```{r}
+# Showing the number of publications and keywords per year.
+entrez_clean %>%
+  unnest(keywords) %>%
+  left_join(stg_kws, relationship = "many-to-many") %>%
+  group_by(publication_year) %>% 
+  summarize(., 
+            publications = n_distinct(pubmed_id), 
+            keyword_c = n_distinct(lower_kw)
+            ) %>% 
+  ggplot(., aes(x = publication_year, y = publications)) + geom_col(fill = "#0072b2") + xlab("Publication Year") + ylab("Publications using PMDD as keyword") + scale_fill_discrete(name = "Keyword") + geom_line(mapping = aes(y= keyword_c/3), color = "#d55e00") + scale_y_continuous(sec.axis = sec_axis(~ . *3, name = "Keywords used in PMDD publications")) 
+
+```
+
+### What is the percentage of articles that use keywords?
+
+Out of the 1352 publications related to PMDD until the end of July 2024, 34.24% provide keywords in PubMed.
+
+```{r}
+# Calculate the number of publications that use a keyword
+entrez_clean %>% 
+  unnest(keywords) %>% 
+  summarize(all_publications = n_distinct(entrez_clean$pubmed_id, na.rm = FALSE),
+            with_kws_pubs_perc = round(n_distinct(pubmed_id, na.rm = FALSE)/all_publications*100, digits = 2),
+            no_kws_pubs_perc = 100 - with_kws_pubs_perc
+            )
+```
+
+## How many MeSH terms are used to describe PMDD publications?
+
+"The Medical Subject Headings (MeSH) thesaurus is a controlled and hierarchically-organized vocabulary produced by the National Library of Medicine."
+
+MeSH terms are used in a similar way than keywords in the literature, but the categorization of whether or not a MeSH term is used in a paper depends on the definitions assigned by the National Library of Medicine (NLM). Therefore, the use of a MeSH term may be a bit more regulated than the use of an equivalent keyword. 
+
+Given the big overlap of the potential use of keywords and MeSH terms, the following blocks will look into whether MeSH terms should be used over keywords, or the other way around. However, before running any calculations using MeSH terms, it is important to note that the data obtained from PubMed indicates a "major MeSH" term or a general "MeSH term". For the analysis in this document, "major MeSH" is interpreted as the central topic of the paper, and the rest of the MeSH terms are considered more similar to keywords, indicating relevance to the study.
+
+Since MeSH terms are established by the NLM, there is no need to focus on cleaning the list of MeSH terms obtained for the PMDD literature. After unnesting the fields storing the MeSH terms used in PMDD publications in PubMed, 398 major MeSH terms spanning over 1165 general MeSH terms are found providing a coverage of 43.9% of the PMDD publications using MeSH terms. 
+
+
+```{r}
+# Calculate the number of publications that use a MeSH term
+entrez_clean %>% 
+  unnest(major_mesh) %>% 
+  unnest(mesh_terms) %>% 
+  summarize(major_mesh_c = n_distinct(entrez_clean$major_mesh, na.rm = TRUE),
+            general_mesh_c = n_distinct(entrez_clean$mesh_terms, na.rm = TRUE),
+            all_publications = n_distinct(entrez_clean$pubmed_id, na.rm = TRUE),
+            with_mesh_pubs_perc = round(n_distinct(pubmed_id, na.rm = TRUE)/all_publications*100, digits = 2),
+            no_mesh_pubs_perc = 100 - with_mesh_pubs_perc
+            )
+```
+
+### Which are the 30 most used MeSH terms before 2019?
+
+Unlike observations with the keywords used in publications before 2019, "Premenstrual Syndrome" is the top most used major MeSH term, and "Premenstrual Dysphoric Disorder" is the 5th most used major MeSH terms. It is also interesting to see that MeSH terms are quite general when compared to the keywords authors use to describe their work.
+
+```{r}
+
+# Let's take a look at all the major_mesh terms
+mesh <- entrez_clean %>% 
+  unnest(major_mesh) %>% 
+  group_by(major_mesh) %>% 
+  summarize(publications = n_distinct(pubmed_id),
+            first_date = min(publication_year, na.rm = TRUE),
+            pubs_before_2019 = n_distinct(case_when(publication_year < 2019 ~ as.character(pubmed_id), .default = NA), na.rm = TRUE),
+            pubs_after_2019 = n_distinct(case_when(publication_year >= 2019 ~ as.character(pubmed_id), .default = NA), na.rm = TRUE)
+            ) %>% 
+  arrange(desc(publications))
+
+
+# And let's also look into the rest of the MeSH terms used 
+mesh_terms <- entrez_clean %>%
+  unnest(mesh_terms) %>%
+  group_by(mesh_terms) %>% 
+  summarize(publications = n_distinct(pubmed_id),
+            first_date = min(publication_year, na.rm = TRUE),
+            pubs_before_2019 = n_distinct(case_when(publication_year < 2019 ~ as.character(pubmed_id), .default = NA), na.rm = TRUE),
+            pubs_after_2019 = n_distinct(case_when(publication_year >= 2019 ~ as.character(pubmed_id), .default = NA), na.rm = TRUE)
+            ) %>% 
+  arrange(desc(publications))
+
+
+
+# Plot the number of publications for the top 30 major MeSH terms used before 2019
+
+ggplot(data = head(mesh, n=30), aes(x = fct_reorder(major_mesh, pubs_before_2019), y = pubs_before_2019) ) +
+  geom_col(fill = "#0072b2") +
+  coord_flip() + scale_y_continuous(name="Number of publications") +
+  scale_x_discrete(name="Major MeSH term") +
+  ggtitle("# of Publications before 2019")
+
+```
+
+```{r}
+
+# Plot the number of publications for the top 30 MeSH terms used  before 2019
+
+ggplot(data = head(mesh_terms, n=30), aes(x = fct_reorder(mesh_terms, pubs_before_2019), y = pubs_before_2019) ) +
+  geom_col(fill = "#0072b2") +
+  coord_flip() + scale_y_continuous(name="Number of publications") +
+  scale_x_discrete(name="MeSH term") +
+  ggtitle("# of Publications before 2019")
+
+```
+### Which MeSH terms were introduced after 2019? 
+
+As  observed in the use of keywords introduced on or after 2019, major MeSH terms referring to suicide and neurotransmitters are introduced as well. However, it is interesting to note that the major MeSH term "Pregnanolone" is used for the first time in a PMDD publication on 2021, while "allopregnanolone" is indicated as a keyword for the first time in 2011. 
+
+```{r}
+# Plot the number of publications for the top 30 major MeSH terms used for the first time after 2019
+
+ggplot(data = head(filter(mesh, first_date >= 2019), n=30), aes(x = fct_reorder(major_mesh, pubs_after_2019), y = pubs_after_2019) ) +
+  geom_col(fill = "#0072b2") +
+  coord_flip() + scale_y_continuous(name="Number of publications") +
+  scale_x_discrete(name="Major MeSH term") +
+  ggtitle("# of Publications after 2019")
+```
+
+### How does MeSH term utilization change over time?
+
+Use of major MeSH terms for PMS and PMDD is more pronounced than in the keyword utilization. While with keywords the use of PMDD was first observed since before 2000 and started to be utilized more than PMS after 2010, the use of the "Premenstrual Dysphoric Disorder" started to be utilized as a MeSH term in 2012, and as a major MeSH term until 2015. This selection over term utilization may be explained due to the lack of a formal definition of PMDD in the DSM-IV in 1993, which categorized it as a "condition for further study" and upgraded to a "depressive disorder" in the DSM-5 in 2013. 
+
+```{r}
+# How did the use of the term PMDD change over time? 
+entrez_clean %>%
+  unnest(mesh_terms) %>%
+  filter(mesh_terms %in% c("Premenstrual Dysphoric Disorder","Premenstrual Syndrome")) %>% 
+  group_by(mesh_terms, publication_year) %>% 
+  summarize(., publications = n_distinct(pubmed_id, na.rm = TRUE)
+            ) %>% 
+  ggplot(., aes(x = publication_year, y = publications, fill = toupper(mesh_terms))) + geom_col(position = position_dodge()) + xlab("Publication Year") + ylab("Publications using MeSH term") + scale_fill_discrete(name = "MeSH terms") + theme(legend.position = "bottom")
+
+```
+
+More publications use MeSH terms than keywords (43.9% compared to 34.3% respectively). However, the MeSH terms tend to be more general than keywords, as keywords are assigned by the authors and MeSH terms follow the National Library of Medicine guidelines. Therefore, keywords will be used instead of MeSH terms in downstream analyses.
+
+## How many institutions have published PMDD articles?
+
+Out of all data obtained from PubMed, the author affiliation field appears to be the most inconsistent, as it appears there is no common format on how to populate this field among journals. Some of the formats observed include:
+
+- `Department Name, Institution name, City, Country`, 
+
+- `Department Name, School Name, Contry`,
+
+- `Institution Name, Department, City, Country`
+
+Therefore, the reported affiliations were split into individual components to get some insights on the institutions publishing PMDD articles, using the commas separating each component as the delimiter. Then, the individual components using terms that suggest the study was done in an academic center were selected. The terms used to identify academic centers were:
+
+```
+universit, center, centre, clinic, institut, college
+```
+
+While this does not include all the affiliations in the PMDD publications in the data obtained from PubMed, 1575 academic centers were identified across 2073 authors and 1115 unique publications, corresponding to ~82.7% of the PMDD publications to date. 
+
+```{r}
+
+author_details <- entrez_clean %>% 
+  unnest(author_details) %>% 
+  transmute(pubmed_id,
+            author_name, 
+            author_affiliation,
+            split_affiliation_name = strsplit(author_affiliation, split= ",", fixed = TRUE)
+            ) %>% 
+  unnest(split_affiliation_name) %>%
+  mutate(academic_center = case_when(grepl("universit|center|centre|clinic|institut",  split_affiliation_name, ignore.case = TRUE) ~ as.character(split_affiliation_name),
+                                     grepl("college of medicine", split_affiliation_name, ignore.case = TRUE) ~ NA,
+                                     grepl("college", split_affiliation_name, ignore.case = TRUE) ~ as.character(split_affiliation_name)))
+
+
+author_details %>% 
+  filter(!is.na(academic_center)) %>% 
+  summarize(publications = n_distinct(pubmed_id, na.rm = TRUE),
+            author_names = n_distinct(author_name, na.rm = TRUE),
+            academic_centers = n_distinct(academic_center, na.rm = TRUE))
+```
+
+### Which institution has been the most prolific in terms of PMDD publications?
+
+With a clean version of the author affiliations, the number of PMDD publications produced by each of the identified academic centers was calculated. Based on the terms selected to identify academic centers Uppsala University, University of California and McMaster University were found to be the top 3 academic centes with the most impact on PMDD literature.
+
+```{r}
+# Calculate the number of publications by each academic center
+affiliations <- author_details %>% 
+  filter(!is.na(academic_center)) %>% 
+  group_by(academic_center) %>% 
+  summarize(publications = n_distinct(pubmed_id, na.rm = TRUE),
+            author_affiliations = n_distinct(author_affiliation, na.rm = TRUE),
+            author_names = n_distinct(author_name, na.rm = TRUE)
+            ) %>% 
+  arrange(desc(publications))
+
+# Show the top 30 affiliations
+head(affiliations, n=30)
+```
+
+## Who are the top 30 authors in the PMDD field (based on publication count)?
+
+The table below shows the authors who have contributed the most to PMDD scientific knowledge. However, it is important to note that with the available data it is not possible to discern if authors have multiple name formats (e.g. one initial vs two initials). The number of academic centers found for each author is also reporting. 
+
+```{r}
+n_articles_author <- author_details %>%
+  group_by(author_name) %>% 
+  summarize(academic_centers = n_distinct(academic_center, na.rm = TRUE),
+            articles = n_distinct(pubmed_id)
+            ) %>% 
+  arrange(desc(articles))
+  
+
+head(n_articles_author, n=30)
+```
+
+## How many individual papers are referenced amongst the PMDD literature?
+
+```{r}
+citations <- entrez_clean %>% 
+  filter(publication_year >= 2020) %>% 
+  unnest(pubmed_references) %>% 
+  group_by(pubmed_reference = pubmed_references) %>% 
+  reframe(papers_citing = n_distinct(pubmed_id),
+          is_pmdd_paper = case_when(pubmed_reference %in% entrez_clean$pubmed_id ~ 1, .default = 0),
+          latest_used = max(publication_year)
+  ) %>% 
+  unique()
+
+entrez_clean %>% 
+  unnest(pubmed_reference = pubmed_references) %>%
+  filter(pubmed_reference == 12892987) %>% 
+  select(pubmed_id,
+         pubmed_reference,
+         publication_year) %>% 
+  arrange(desc(publication_year)) %>% 
+  unique()
+
+#For this calculationI need to combine all the IDs
+citations %>% 
+  summarize(pmdd_papers = sum(is_pmdd_paper),
+            non_pmdd_papers = n_distinct(pubmed_reference) - sum(is_pmdd_paper),
+            all_citations = n_distinct(pubmed_reference)
+            )
+```
+
+-   Are citations being recycled?
+-   What is the average time range across cited references?
+-   Can we tell if authors are circling back to their own publications?
+    -   How many institutions are being referenced?
+-   What proportion of PMDD articles came from a Canadian institution?
+-   How many keywords are used to describe PMDD articles on PubMed?
+    -   What is the percentaje of articles that use keywords?
+    -   Which are the top 50 keywords used in PMDD articles on PubMed?
+-   How many MeSH terms are used to describe PMDD articles on PubMed?
+    -   What is the percentaje of articles that use MeSH terms?
+    -   Which are the top 50 MeSH terms used in PMDD articles on PubMed?
