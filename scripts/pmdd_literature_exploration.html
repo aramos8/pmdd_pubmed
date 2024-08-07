@@ -3361,7 +3361,7 @@ count)?</h2>
 PMDD scientific knowledge. However, it is important to note that with
 the available data it is not possible to discern if authors have
 multiple name formats (e.g. one initial vs two initials). The number of
-academic centers found for each author is also reporting.</p>
+academic centers found for each author is also reported.</p>
 <pre class="r"><code>n_articles_author &lt;- author_details %&gt;%
   group_by(author_name) %&gt;% 
   summarize(academic_centers = n_distinct(academic_center, na.rm = TRUE),
