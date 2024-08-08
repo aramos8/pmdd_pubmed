@@ -17,7 +17,7 @@ A more comprehensive description of the work will is included in the following s
 
 The `pmdd_entrez.sh` script is writen based on instructions provided in the [Entrez Direct: E-utilities on the Unix Command Line](https://www.ncbi.nlm.nih.gov/books/NBK179288/#chapter6.Structured_Data) by NCBI. The objective of this script is to collect the desired fields from PubMed in an XML file. 
 
-To pull the data from NCBI, go to the `data` directory and run the following command.  
+To pull the data from NCBI, go to the `scripts` directory and run the following command.  
 ```
 bash pmdd_entrez.sh
 ```
@@ -58,20 +58,20 @@ Once installed, run the following command in the `data` directory to cary out th
 yq -p=xml -o=json pmdd_entrez.xml > pmdd_entrez.json
 ```
 
-### 3. Loading the JSON file to DuckDB
+### 3. Model the data in DuckDB
 
-Parsing of the JSON file was done using `read_json`, following the advice available in this [GitHub issue](https://github.com/duckdb/duckdb/issues/7015).
+In order to get the data in a format that is more comfortable to process downstream, a local database will be created using [DuckDB](https://duckdb.org/docs/), which can be found in `data/pmdd.db`. 
 
-### 4. Model the data in DuckDB
+Loading and parsing of the JSON file was done using the `read_json` function in DuckDB, following the advice available in this [GitHub issue](https://github.com/duckdb/duckdb/issues/7015).
 
-After loading the JSON file, the next step is to extract the relevant information and model it in a way that it can serve multiple functions downstream. As such, the PMDD PubMed data in the JSON file was modelled into a denormalized table, which will be used as the main source of data in downstream analyses and visualizations. 
+The PMDD PubMed data in the JSON file was modelled into a denormalized table as per `entrez_clean.sql` found in the `data` directory, resulting in the `entrez_table` in the `pmdd.db` database. This table will be used as the main source of data in downstream analyses and visualizations. 
 
 DuckDB's `read_json` function did most of the heavy lifting. All that was left to do was nest all applicable fields (e.g. keywords, MeSH terms, author details) in an easy to process format. This work resulted in table `entrez_clean` which will now be used downstream in R and with further SQL modelling (if required). 
 
 *NOTE: If further modelling using SQL is needed, this project will use `dbt` to manage the dependencies in the ETL pipeline. At the current state of this project, however, only the `entrez_clean` table is used for all downstream calculations in R.*
 
 
-### 5. Build notebook with visualizations and insights in R
+### 4. Build notebook with visualizations and insights in R
 
 This notebook will provide an exploratory analysis of the PMDD literature data obtained from PubMed. The objective is to get familiar with the data and start coming up with ideas of ways to visualize the data in a dashboard. 
 
