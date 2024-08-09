@@ -335,6 +335,7 @@ ggplot(data = head(mesh_terms, n=30), aes(x = fct_reorder(mesh_terms, pubs_befor
   ggtitle("# of Publications before 2019")
 
 ```
+
 ### Which MeSH terms were introduced after 2019? 
 
 As  observed in the use of keywords introduced on or after 2019, major MeSH terms referring to suicide and neurotransmitters are introduced as well. However, it is interesting to note that the major MeSH term "Pregnanolone" is used for the first time in a PMDD publication on 2021, while "allopregnanolone" is indicated as a keyword for the first time in 2011. 
