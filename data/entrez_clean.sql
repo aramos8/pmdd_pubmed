@@ -81,6 +81,40 @@ authors_details_cte AS (
             )
         )
         GROUP BY pubmed_id
+),
+
+clean_abstract AS (
+    SELECT DISTINCT
+        pubmed_id,
+        STRING_AGG(abstracts.abstract) OVER (PARTITION BY pubmed_id) AS abstract
+    FROM casting, UNNEST(abstract) as abstracts
+),
+
+clean_references AS (
+    SELECT
+        pubmed_id,
+        ARRAY_AGG(DISTINCT ref) AS all_references 
+    FROM 
+        (SELECT DISTINCT
+            pubmed_id,
+            unnest.doi_references AS ref
+        FROM casting, UNNEST(doi_references) AS unnest
+        
+        UNION ALL 
+
+        SELECT DISTINCT
+            pubmed_id,
+            unnest.pubmed_references AS ref
+        FROM casting, UNNEST(pubmed_references) AS unnest
+
+        UNION ALL 
+
+        SELECT DISTINCT
+            pubmed_id,
+            unnest.pmc_references AS ref
+        FROM casting, UNNEST(pmc_references) AS unnest
+        )
+    GROUP BY pubmed_id
 )
 
 SELECT 
@@ -96,13 +130,18 @@ SELECT
     mesh_terms,
     keywords,
     title,
-    abstract,
+    clean_abstract.abstract,
     author_details,
+    clean_references.all_references,
     pubmed_references,
     pmc_references,
     doi_references
 FROM casting
 LEFT JOIN authors_details_cte
+USING(pubmed_id)
+LEFT JOIN clean_abstract
+USING(pubmed_id)
+LEFT JOIN clean_references
 USING(pubmed_id);
 
 
