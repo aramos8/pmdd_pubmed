@@ -34,10 +34,13 @@ This notebook will use a combination of [DuckDB](https://duckdb.org/docs/api/r) 
 ```{r}
 # Install packges
 library(duckdb)
+library(DBI)
 library(tidyverse)
 library(dplyr)
 library(forcats)
 library(conflicted)
+library(rvest)
+library(httr)
 
 conflicts_prefer(dplyr::filter)
 
@@ -150,12 +153,12 @@ keywords <- entrez_clean %>%
 Up until the end of July 2024, a total of 1,236 unique keywords have been used in PMDD publications in PubMed, of which 609 (49%) were introduced before 2019, and 627 (51%) were introduced on 2019 or after. The use of more keywords after 2019 may be a consequence of a broader abundance of fields researching PMDD with the introduction of the condition to the ICD-11. To further explore this idea, the following sections look intowhich keywords were more predominantly used before and after 2019, as well as which keywords were introduced on or after 2019. 
 
 ```{r}
-print(keywords %>% 
+keywords %>% 
   summarize(keywords = n_distinct(keyword, na.rm = TRUE),
             before_2019 = n_distinct(case_when(first_date < 2019 ~ keyword), na.rm = TRUE),
             after_2019 = n_distinct(case_when(first_date >= 2019 ~ keyword), na.rm = TRUE)
                                      )
-)
+
 ```
 
 
@@ -258,6 +261,47 @@ entrez_clean %>%
             with_kws_pubs_perc = round(n_distinct(pubmed_id, na.rm = FALSE)/all_publications*100, digits = 2),
             no_kws_pubs_perc = 100 - with_kws_pubs_perc
             )
+```
+
+About 66% of the articles extracted from PubMed include keywords. Interestingly, many of the publications that to not have keywords reported in PubMed do have them in PMC. Therefore, a potential future direction of this work could include extracting all the keywords from the PMC record in NCBI. However, Entrez does not have access to PMC keywords, so a web scraper will be used instead, as keywords from PMC articles can be pulled from the `class=kwd_text` HTML element.
+
+First, a list of PMC IDs is collected. 
+
+```{r}
+# Get all PMC IDs to extract keywords
+kw_pmcids <- entrez_clean %>% 
+  filter(keywords == 'NULL') %>% 
+  select(pmc_id) %>% 
+  filter(!is.na(pmc_id)) %>% 
+  mutate(link = paste0("https://www.ncbi.nlm.nih.gov/pmc/articles/", pmc_id, "/")) %>% 
+  unique()
+  #filter(pmc_id %in% c('PMC6741762', 'PMC7220159'))
+         
+
+# 
+# read_html("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6741762/") %>% 
+#   html_elements(".kwd-text")
+# 
+# test <-  get_html_kws(kw_pmcids$link[[1]])
+# print(test)
+
+# Write function to get keywords from HTML
+get_html_kws <- function(x) {
+  read_html((x)) %>% 
+    html_elements(".kwd-text") %>% 
+    html_text()
+}
+
+
+
+
+# Get all keywords from HTML
+for (i in 1:length(kw_pmcids$link)) {
+  GET(kw_pmcids$link[[i]], add_headers('user-agent' ="Bioinformatics student (anaramos.data@gmail.com)")) # Without this line, I get 'Error in open.connection(x, "rb") : HTTP error 403.'
+  kw_pmcids$p_keywords[[i]] <- get_html_kws(kw_pmcids$link[[i]])
+}
+
+
 ```
 
 ## How many MeSH terms are used to describe PMDD publications?
@@ -447,30 +491,66 @@ head(n_articles_author, n=30)
 ## How many individual papers are referenced amongst the PMDD literature?
 
 ```{r}
+# First let's get a list of all the PMDD publications and all the references used, identifying if the reference is one of the PMDD publications in our data
 citations <- entrez_clean %>% 
-  filter(publication_year >= 2020) %>% 
-  unnest(pubmed_references) %>% 
-  group_by(pubmed_reference = pubmed_references) %>% 
-  reframe(papers_citing = n_distinct(pubmed_id),
-          is_pmdd_paper = case_when(pubmed_reference %in% entrez_clean$pubmed_id ~ 1, .default = 0),
-          latest_used = max(publication_year)
-  ) %>% 
-  unique()
-
-entrez_clean %>% 
-  unnest(pubmed_reference = pubmed_references) %>%
-  filter(pubmed_reference == 12892987) %>% 
+  unnest(all_references) %>% 
+  mutate(is_pmdd = case_when(all_references %in% entrez_clean$pubmed_id | all_references %in% entrez_clean$pmc_id | all_references %in% entrez_clean$doi ~ 1, .default = 0)) %>% 
   select(pubmed_id,
-         pubmed_reference,
-         publication_year) %>% 
-  arrange(desc(publication_year)) %>% 
+         publication_year,
+         citation = all_references,
+         is_pmdd) %>% 
   unique()
+  
 
-#For this calculationI need to combine all the IDs
-citations %>% 
-  summarize(pmdd_papers = sum(is_pmdd_paper),
-            non_pmdd_papers = n_distinct(pubmed_reference) - sum(is_pmdd_paper),
-            all_citations = n_distinct(pubmed_reference)
+# Let's calculate the total number of references used  
+citations %>%
+  group_by(pubmed_id) %>% 
+  mutate(citations_count = n_distinct(citation, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  summarize(all_references = n_distinct(citation, na.rm = TRUE),
+            pmdd_references = n_distinct(case_when(is_pmdd == 1 ~ citation), na.rm = TRUE),
+            non_pmdd_references = n_distinct(case_when(is_pmdd == 0 ~ citation), na.rm = TRUE),
+            citations_per_paper = mean(citations_count),
+            most_citations_in_paper = max(citations_count),
+            least_citations_in_paper = min(citations_count)
             )
+
 ```
 
+```{r}
+## Let's identify which PMDD and non-PMDD references are the most cited
+most_cited <- citations %>% 
+  #filter(publication_year >= 2019) %>% 
+  group_by(citation) %>% 
+  mutate(cited_in = n_distinct(pubmed_id)) %>% 
+  arrange(desc(cited_in)) %>% 
+  select(citation,
+       cited_in, is_pmdd) %>%
+  unique() %>% 
+  group_by(is_pmdd) %>% 
+  filter(row_number()<=5) %>% 
+  arrange(desc(is_pmdd))
+
+
+print(paste("The most cited PMDD publication is", most_cited$citation[[1]], "which has been cited in", most_cited$cited_in[[1]], "publications"))
+print(paste("The most cited non-PMDD publication is", most_cited$citation[[5+1]], "which has been cited in", most_cited$cited_in[[5+1]], "publications"))
+
+
+
+```
+
+```{r}
+# How has citations of the Halbreich et al., 2003 publication changed over time
+citations %>% 
+  #filter(citation %in% c(12892987, 16172836)) %>% 
+  filter(citation %in% most_cited$citation[1:5]) %>% 
+  group_by(publication_year, citation) %>% 
+  summarize(cited_in = n_distinct(pubmed_id)) %>% 
+  ggplot(., aes(x = publication_year, y = cited_in, fill = toupper(citation))) + geom_col(position = position_dodge()) + xlab("Publication Year") + ylab("Referenced in # of publications") + scale_fill_discrete(name = "ID") + theme(legend.position = "bottom")
+
+```
+
+
+Remaining calculations to include:
+- Number of affiliations cited?
+- Number of authors in citations? 
