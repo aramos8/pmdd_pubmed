@@ -93,15 +93,15 @@ get_details <- function(id) {
     abstract <- 'N/A'
   }
   # authors
-  if(length(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/authors")) %>% xml_text()) > 0){
-    authors <- list(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/authors")) %>% xml_text())
+  if(length(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/authors/author")) %>% xml_text()) > 0){
+    authors <- list(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/authors/author")) %>% xml_text())
   }else{
     authors <- 'N/A'
   }
   
   # author_affiliations
-  if(length(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/author_affiliations")) %>% xml_text()) > 0){
-    author_affiliations <- list(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/author_affiliations")) %>% xml_text())
+  if(length(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/author_affiliations/affiliation")) %>% xml_text()) > 0){
+    author_affiliations <- list(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/author_affiliations/affiliation")) %>% xml_text())
   }else{
     author_affiliations <- 'N/A'
   }
