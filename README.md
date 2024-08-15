@@ -78,7 +78,7 @@ WIP - Currently exploring the best way to access this data
 
 The local [DuckDB](https://duckdb.org/docs/) database `pmdd.db` was built and included in the `/data` directory of this repository (while size permits). 
 
-Most of the necessary data cleaning steps were done in `pmdd_entrez.R`, and final modeling steps were done in `pmdd_entrez.sql` found in the `/data` directory (e.g. repackaging author details, combining all references into single field, combining all abstract pieces into single paragraph). The resulting table was saved as `entrez_clean` in the database.
+Most of the necessary data cleaning steps were done in `pmdd_entrez.R`, and final modeling steps were done in `pmdd_entrez.sql` found in the `/scripts` directory (e.g. repackaging author details, combining all references into single field, combining all abstract pieces into single paragraph). The resulting table was saved as `entrez_clean` in the database.
 
 *NOTE: If further modelling using SQL is needed, this project will use [`dbt`](https://docs.getdbt.com) to manage the dependencies in the ETL pipeline. At the current state of this project, however, only the `entrez_clean` table is used for all downstream calculations in R.*
 
