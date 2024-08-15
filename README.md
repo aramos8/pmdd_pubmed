@@ -55,7 +55,7 @@ xtract -pattern PubmedArticle -element MedlineCitation/PMID > pubmed_ids.csv
 
 The `pmdd_entrez.sh` bash script outputs the data into an XML format. However, importing the XML directly into DuckDB was not readily available. Therefore, in this project the data in the XML file obtained from Pubmed will be extracted using the `xml2` package in R. 
 
-This step is acomplished by the `pmdd_entrez.R` script, which includes a function to extract the data from the XML, imports the data into a data frame, and then does a bit of cleaning of the resulting data frame. Lastly, the cleaned data frame is imported to the `pmdd.db` database as `entrez_clean_df`.
+This step is accomplished by the `pmdd_entrez.R` script, which includes a function to extract the data from the XML, imports the data into a data frame, and then does a bit of cleaning of the resulting data frame. Lastly, the cleaned data frame is imported to the `pmdd.db` database as `entrez_clean_df`.
 
 
 #### Additional data from PMC **(WIP)**
@@ -69,6 +69,8 @@ PMC data was downloaded using their FTP service, using the following command lin
 wget --accept "*xml*" --no-directories --recursive --no-parent \
 ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_bulk/
 ```
+
+    *NOTE: Once new data becomes available and the automated dashboard is ready, the `-N` flag will be added to the command above to get only the new files.*
 
 WIP - Currently exploring the best way to access this data
 
