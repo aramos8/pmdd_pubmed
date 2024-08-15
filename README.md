@@ -51,35 +51,36 @@ xtract -pattern PubmedArticle -element MedlineCitation/PMID > pubmed_ids.csv
 ```
 *The resulting CSV contains the same 1352 pubmed IDs, confirming that the XML repackaging in the bash script is not leading to a drop of articles*
 
-### 2. Converting XML data to JSON
+### 2. Extracting XML data
 
-The `pmdd_entrez.sh` bash script outputs the data into an XML format. However, converting the XML file to JSON makes it easier to import the data into a DuckDB local database.
+The `pmdd_entrez.sh` bash script outputs the data into an XML format. However, importing the XML directly into DuckDB was not readily available. Therefore, in this project the data in the XML file obtained from Pubmed will be extracted using the `xml2` package in R. 
 
-To achieve this format conversion, this pipeline uses [yq](https://github.com/mikefarah/yq). 
+This step is acomplished by the `pmdd_entrez.R` script, which includes a function to extract the data from the XML, imports the data into a data frame, and then does a bit of cleaning of the resulting data frame. Lastly, the cleaned data frame is imported to the `pmdd.db` database as `entrez_clean_df`.
 
-Homebrew installation is recommended: 
 
+#### Additional data from PMC **(WIP)**
+
+While exploring the data, it was clear that some publications do not include the keywords through PubMed, but they do through PMC. Therefore, PMC data was bulk downloaded in XML format following the steps indicated by NCBI's [FTP Service](https://www.ncbi.nlm.nih.gov/pmc/tools/ftp/#bulk). 
+
+*Please note that while PMC provides open access for users to read publications, bulk download of PMC data is only allowed via NCBI approved retrieval methods (see [here](https://www.ncbi.nlm.nih.gov/pmc/tools/openftlist/) for more details)*
+
+PMC data was downloaded using their FTP service, using the following command line prompt:
 ```
-brew install yq
+wget --accept "*xml*" --no-directories --recursive --no-parent \
+ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_bulk/
 ```
 
-Once installed, run the following command in the `data` directory to cary out the conversion: 
-```
-yq -p=xml -o=json pmdd_entrez.xml > pmdd_entrez.json
-```
+WIP - Currently exploring the best way to access this data
 
 ### 3. Model the data in DuckDB
 
-In order to get the data in a format that is more comfortable to process downstream, a local database will be created using [DuckDB](https://duckdb.org/docs/), which can be found in `data/pmdd.db`. 
+The local [DuckDB](https://duckdb.org/docs/) database `pmdd.db` was built and included in the `/data` directory of this repository (while size permits). 
 
-Loading and parsing of the JSON file was done using the `read_json` function in DuckDB, following the advice available in this [GitHub issue](https://github.com/duckdb/duckdb/issues/7015).
+Most of the necessary data cleaning steps were done in `pmdd_entrez.R`, and final modeling steps were done in `pmdd_entrez.sql` found in the `/data` directory (e.g. repackaging author details, combining all references into single field, combining all abstract pieces into single paragraph). The resulting table was saved as `entrez_clean` in the database.
 
-The PMDD PubMed data in the JSON file was modelled into a denormalized table as per `entrez_clean.sql` found in the `data` directory, resulting in the `entrez_table` in the `pmdd.db` database. This table will be used as the main source of data in downstream analyses and visualizations. 
+*NOTE: If further modelling using SQL is needed, this project will use [`dbt`](https://docs.getdbt.com) to manage the dependencies in the ETL pipeline. At the current state of this project, however, only the `entrez_clean` table is used for all downstream calculations in R.*
 
-DuckDB's `read_json` function did most of the heavy lifting. All that was left to do was nest all applicable fields (e.g. keywords, MeSH terms, author details) in an easy to process format. This work resulted in table `entrez_clean` which will now be used downstream in R and with further SQL modelling (if required). 
-
-*NOTE: If further modelling using SQL is needed, this project will use `dbt` to manage the dependencies in the ETL pipeline. At the current state of this project, however, only the `entrez_clean` table is used for all downstream calculations in R.*
-
+WIP - Currently exploring the best way to access the downloaded PMC data to import into database. 
 
 ### 4. Build notebook with visualizations and insights in R
 
