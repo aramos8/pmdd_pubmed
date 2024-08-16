@@ -166,7 +166,7 @@ database_path <- file.path("data", "pmdd.db")
 
 con <- dbConnect(duckdb(), dbdir = database_path)
 
-# Ensure databse connection is closed when closing this notebook
+# Ensure databse connection is closed when closing this file
 #on.exit(dbDisconnect(con), add = TRUE)
 
 # Register data frame as DuckDB table

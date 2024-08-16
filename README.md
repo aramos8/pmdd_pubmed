@@ -2,9 +2,9 @@
 
 The objective of this project is to build a tool that can help PMDD patients to find scientific literature on the conditions (see a brief introduction on PMDD below). This tool will consist of a dashboard that will allow patients to find scientific papers from PubMed so that they can have more information to discuss with their doctors, and explore new treatment options with them. 
 
-In addition, this project will explore how the scientific literature is cited among PMDD publications, with the objective of building a visual mapping tool to facilitate source and fact checking of the literature, and to facilitate collaboration amongst research groups. Therefore, while the dashboard is intended to support patients, the literature map is intended to support clinicians and researchers in their advancement of PMDD research. 
+In addition, this project will explore how the scientific literature is cited among PMDD publications, with the objective of building a visual mapping tool to facilitate source and fact checking of the literature, and to facilitate collaboration among research groups. Therefore, while the dashboard is intended to support patients, the literature map is intended to support clinicians and researchers in their advancement of PMDD research. 
 
-To acomplish this, this project will first focus on performing an exploratory analysis of the data available in PubMed. The first focus will extracting the data from PubMed using the [Entrez Direct: E-utilities on the Unix Command Line](https://www.ncbi.nlm.nih.gov/books/NBK179288/#chapter6.Structured_Data) by NCBI. The extracted data will then be modelled using SQL in a [DuckDB](https://duckdb.org/docs) local database, and explored and visualized in an R notebook.
+To accomplish this, this project will first focus on performing an exploratory analysis of the data available in PubMed. The first focus will be extracting the data from PubMed using the [Entrez Direct: E-utilities on the Unix Command Line](https://www.ncbi.nlm.nih.gov/books/NBK179288/#chapter6.Structured_Data) by NCBI. The extracted data will then be modelled using SQL in a [DuckDB](https://duckdb.org/docs) local database, and explored and visualized in an R notebook.
 
 Once relevant insights are identified in the exploratory analysis, the dashboard and visual mapping tools will be built and shared with the PMDD community. 
 
@@ -25,7 +25,7 @@ A more comprehensive description of the work will is included in the following s
 
 ### 1. Pulling Data from Pubmed using the command line interface for Entrez
 
-The `pmdd_entrez.sh` script is writen based on instructions provided in the [Entrez Direct: E-utilities on the Unix Command Line](https://www.ncbi.nlm.nih.gov/books/NBK179288/#chapter6.Structured_Data) by NCBI. The objective of this script is to collect the desired fields from PubMed in an XML file. 
+The `pmdd_entrez.sh` script is written based on instructions provided in the [Entrez Direct: E-utilities on the Unix Command Line](https://www.ncbi.nlm.nih.gov/books/NBK179288/#chapter6.Structured_Data) by NCBI. The objective of this script is to collect the desired fields from PubMed in an XML file. 
 
 To pull the data from NCBI, go to the `scripts` directory and run the following command.  
 ```
@@ -51,6 +51,8 @@ xtract -pattern PubmedArticle -element MedlineCitation/PMID > pubmed_ids.csv
 ```
 *The resulting CSV contains the same 1352 pubmed IDs, confirming that the XML repackaging in the bash script is not leading to a drop of articles*
 
+In addition, a table containing all the IDs related to all Pubmed publications were obtained by running `pubmed_ids.sh`. This script pulls the data both in XML and .tsv formats, and the .tsv file is entered directly to the `pmdd.db` database to get a clean view of which documents are referenced in each publication.
+
 ### 2. Extracting XML data
 
 The `pmdd_entrez.sh` bash script outputs the data into an XML format. However, importing the XML directly into DuckDB was not readily available. Therefore, in this project the data in the XML file obtained from Pubmed will be extracted using the `xml2` package in R. 
@@ -66,7 +68,7 @@ While exploring the data, it was clear that some publications do not include the
 
 PMC data was downloaded using their FTP service, using the following command line prompt:
 ```
-wget --accept "*xml*" --no-directories --recursive --no-parent \
+wget --accept "*xml*" --reject "*.txt" --no-directories --recursive --no-parent \
 ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_bulk/
 ```
 
@@ -82,7 +84,7 @@ Most of the necessary data cleaning steps were done in `pmdd_entrez.R`, and fina
 
 *NOTE: If further modelling using SQL is needed, this project will use [`dbt`](https://docs.getdbt.com) to manage the dependencies in the ETL pipeline. At the current state of this project, however, only the `entrez_clean` table is used for all downstream calculations in R.*
 
-WIP - Currently exploring the best way to access the downloaded PMC data to import into database. 
+WIP - Currently exploring the best way to access the downloaded PMC data to import into the `pmdd.db` database. 
 
 ### 4. Build notebook with visualizations and insights in R
 
@@ -92,6 +94,6 @@ As this is intended as an exploratory part of the project, the PMDD literature d
 
 ## R Shiny Dashboard (TBD)
 
-The goal is to build a dashboard that helps patients find PMDD literature to educate themselves on the condition, as well as to find literature they would ike to discuss with their doctors. 
+The goal is to build a dashboard that helps patients find PMDD literature to educate themselves on the condition, as well as to find literature they would like to discuss with their doctors. 
 
 This dashboard will be build using R Shiny within a Snakemake workflow. 

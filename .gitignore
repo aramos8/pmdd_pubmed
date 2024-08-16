@@ -3,3 +3,4 @@ learning_files/*
 data/pmdd.db.wal
 .RData
 .Rhistory
+.vscode/*
