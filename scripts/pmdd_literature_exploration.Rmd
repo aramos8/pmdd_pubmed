@@ -33,14 +33,15 @@ This notebook will use a combination of [DuckDB](https://duckdb.org/docs/api/r) 
 
 ```{r}
 # Install packges
-library(duckdb)
 library(DBI)
+library(duckdb)
 library(tidyverse)
 library(dplyr)
 library(forcats)
 library(conflicted)
 library(rvest)
 library(httr)
+library(xml2)
 
 conflicts_prefer(dplyr::filter)
 
@@ -147,7 +148,8 @@ keywords <- entrez_clean %>%
             pubs_before_2019 = n_distinct(case_when(publication_year < 2019 ~ as.character(pubmed_id), .default = NA), na.rm = TRUE),
             pubs_after_2019 = n_distinct(case_when(publication_year >= 2019 ~ as.character(pubmed_id), .default = NA), na.rm = TRUE)
             ) %>% 
-  arrange(desc(publications))
+  arrange(desc(publications)) %>% 
+  filter(!(keyword %in% c('n/a', 'null')))
 ```
 
 Up until the end of July 2024, a total of 1,236 unique keywords have been used in PMDD publications in PubMed, of which 609 (49%) were introduced before 2019, and 627 (51%) were introduced on 2019 or after. The use of more keywords after 2019 may be a consequence of a broader abundance of fields researching PMDD with the introduction of the condition to the ICD-11. To further explore this idea, the following sections look intowhich keywords were more predominantly used before and after 2019, as well as which keywords were introduced on or after 2019. 
@@ -257,52 +259,72 @@ Out of the 1352 publications related to PMDD until the end of July 2024, 34.24% 
 # Calculate the number of publications that use a keyword
 entrez_clean %>% 
   unnest(keywords) %>% 
+  filter(!(keywords %in% c('N/A', 'NULL'))) %>% 
   summarize(all_publications = n_distinct(entrez_clean$pubmed_id, na.rm = FALSE),
             with_kws_pubs_perc = round(n_distinct(pubmed_id, na.rm = FALSE)/all_publications*100, digits = 2),
             no_kws_pubs_perc = 100 - with_kws_pubs_perc
             )
 ```
 
-About 66% of the articles extracted from PubMed include keywords. Interestingly, many of the publications that to not have keywords reported in PubMed do have them in PMC. Therefore, a potential future direction of this work could include extracting all the keywords from the PMC record in NCBI. However, Entrez does not have access to PMC keywords, so a web scraper will be used instead, as keywords from PMC articles can be pulled from the `class=kwd_text` HTML element.
+About 66% of the articles extracted from PubMed include keywords. Interestingly, many of the publications that to not have keywords reported in PubMed do have them in PMC. Therefore, a potential future direction of this work could include extracting all the keywords from the PMC record in NCBI. However, Entrez does not have access to PMC keywords, so to get PMC data the [FTP](https://www.ncbi.nlm.nih.gov/pmc/tools/ftp/) service provided by NCBI will be used. 
 
-First, a list of PMC IDs is collected. 
 
-```{r}
-# Get all PMC IDs to extract keywords
-kw_pmcids <- entrez_clean %>% 
-  filter(keywords == 'NULL') %>% 
+#### Getting PMC keywords data (WIP)
+
+First, the file lists obtained from PMC were combined into a single CSV file to have all the information required. This was done in a separate R script named `pmc_filelist.R`.
+
+WIP...
+
+
+
+```{r, include = FALSE, eval = FALSE}
+# Get list of PMC IDs to extract keywords from 
+kws_pmc_ids <- entrez_clean %>% 
+  filter(keywords %in% c('NULL', 'N/A')) %>% 
   select(pmc_id) %>% 
   filter(!is.na(pmc_id)) %>% 
-  mutate(link = paste0("https://www.ncbi.nlm.nih.gov/pmc/articles/", pmc_id, "/")) %>% 
   unique()
-  #filter(pmc_id %in% c('PMC6741762', 'PMC7220159'))
-         
 
+
+#kws_pmc_ids <- c("PMC5533120", "PMC5427117")
+
+# Function to get keywords from article XML
+pmc_kws <- purrr::map_df(kws_pmc_ids, function(id) {
+  return(data.frame(pmc_id = id, 
+                    keywords = xml_find_all(read_xml(paste0('/Volumes/Vault/PMC/PMC_files/', id, ".xml")), "//kwd") %>% xml_text()
+                      ))
+})
+
+
+#------------------------------------------------
+# This function could have worked too, but I wanted to try map_df
+# Also, map_df required substantially fewer lines of code
+
+# get_keywords <-  function(pmc_id) {
+#   #xml <- read_xml(paste0("/Volumes/Vault/PMC/PMC_files/", pmc_id))
 # 
-# read_html("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6741762/") %>% 
-#   html_elements(".kwd-text")
+#   xml <- read_xml(paste0('/Users/anaelizondo-ramos/Downloads/test/oa_comm_xml.incr.2024-06-19/PMC005xxxxxx/',pmc_id, ".xml"))
 # 
-# test <-  get_html_kws(kw_pmcids$link[[1]])
-# print(test)
+#   pmc_id <-  pmc_id
+# 
+#   if(length(xml_find_all(xml, "//kwd") %>% xml_text()) > 0){
+#     kw <- list(xml_find_all(xml, "//kwd") %>% xml_text())
+#   }else{
+#     kw <- 'N/A'
+#   }
+# 
+#   cbind(pmc_id=pmc_id, kw=kw)
+# }
+# 
+# pmc_kws <- as.data.frame(do.call("rbind", lapply(kws_pmc_ids, get_keywords)), stringsAsFactors = FALSE)
+#------------------------------------------------
 
-# Write function to get keywords from HTML
-get_html_kws <- function(x) {
-  read_html((x)) %>% 
-    html_elements(".kwd-text") %>% 
-    html_text()
-}
 
 
-
-
-# Get all keywords from HTML
-for (i in 1:length(kw_pmcids$link)) {
-  GET(kw_pmcids$link[[i]], add_headers('user-agent' ="Bioinformatics student (anaramos.data@gmail.com)")) # Without this line, I get 'Error in open.connection(x, "rb") : HTTP error 403.'
-  kw_pmcids$p_keywords[[i]] <- get_html_kws(kw_pmcids$link[[i]])
-}
 
 
 ```
+
 
 ## How many MeSH terms are used to describe PMDD publications?
 
@@ -320,6 +342,8 @@ Since MeSH terms are established by the NLM, there is no need to focus on cleani
 entrez_clean %>% 
   unnest(major_mesh) %>% 
   unnest(mesh_terms) %>% 
+  filter(!(mesh_terms %in% c('N/A', 'NULL'))) %>% 
+  filter(!(major_mesh %in% c('N/A', 'NULL'))) %>% 
   summarize(major_mesh_c = n_distinct(entrez_clean$major_mesh, na.rm = TRUE),
             general_mesh_c = n_distinct(entrez_clean$mesh_terms, na.rm = TRUE),
             all_publications = n_distinct(entrez_clean$pubmed_id, na.rm = TRUE),
@@ -337,6 +361,7 @@ Unlike observations with the keywords used in publications before 2019, "Premens
 # Let's take a look at all the major_mesh terms
 mesh <- entrez_clean %>% 
   unnest(major_mesh) %>% 
+  filter(!(major_mesh %in% c('N/A', 'NULL'))) %>% 
   group_by(major_mesh) %>% 
   summarize(publications = n_distinct(pubmed_id),
             first_date = min(publication_year, na.rm = TRUE),
@@ -349,6 +374,7 @@ mesh <- entrez_clean %>%
 # And let's also look into the rest of the MeSH terms used 
 mesh_terms <- entrez_clean %>%
   unnest(mesh_terms) %>%
+  filter(!(mesh_terms %in% c('N/A', 'NULL'))) %>% 
   group_by(mesh_terms) %>% 
   summarize(publications = n_distinct(pubmed_id),
             first_date = min(publication_year, na.rm = TRUE),
@@ -499,7 +525,8 @@ citations <- entrez_clean %>%
          publication_year,
          citation = all_references,
          is_pmdd) %>% 
-  unique()
+  unique() %>% 
+  filter(!is.na(citation) & citation != "N/A")
   
 
 # Let's calculate the total number of references used  
@@ -546,11 +573,10 @@ citations %>%
   filter(citation %in% most_cited$citation[1:5]) %>% 
   group_by(publication_year, citation) %>% 
   summarize(cited_in = n_distinct(pubmed_id)) %>% 
-  ggplot(., aes(x = publication_year, y = cited_in, fill = toupper(citation))) + geom_col(position = position_dodge()) + xlab("Publication Year") + ylab("Referenced in # of publications") + scale_fill_discrete(name = "ID") + theme(legend.position = "bottom")
+  ggplot(., aes(x = publication_year, y = cited_in, fill = toupper(citation))) + geom_col(position = position_dodge()) + xlab("Publication Year") + ylab("Referenced in # of publications") + scale_fill_discrete(name = "ID") + theme(legend.position = "bottom") +
+  ggtitle("Top 5 most cited PMDD publications")
 
 ```
+The graph above shows the top 5 most cited PMDD publications (among PMDD scientific literature).
 
 
-Remaining calculations to include:
-- Number of affiliations cited?
-- Number of authors in citations? 
