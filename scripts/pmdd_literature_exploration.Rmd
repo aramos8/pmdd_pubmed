@@ -18,18 +18,18 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 # Introduction
 
-PMDD (premenstrual dysphoric disorder) is condition affecting menstruating people, both from a psychological perspective and physical perspective. PMDD is characterized by a combination of mood and physical symptoms that occur during the luteal phase of the menstrual cycle, including depression, irritability, joint pain, breast pain, cravings, lethargy, and poor concentration, among others. The condition has had a rather turbulent path to being recognized, with some controversial involvement from big pharma (Moynihan and Cassels, 2005, as cited by [Schroll and Lauritsen, 2022](https://doi.org/10.1111/aogs.14360)). The condition was first introduced into the DSM-III (Diagnostic and Statistical Manual of Mental Disorders, third edition) in 1987 under the name late luteal phase dysphoric disorder (LLPDD); however, after reassessing the symptoms reported by patients the diagnosis criteria was revised and the name premenstrual dysphoric disorder was coined in the DSM-IV in 1993. At this point, the condition was classified as a "condition for further study", and in 2012 it was revised in the DSM-5 edition under the class "depressive disorder". It wasn't until 2019 that PMDD was added to the ICD-11 under code [GA34.41](https://icd.who.int/browse/2024-01/mms/en#1526774088), granting the condition full medical recognition under the WHO. 
+PMDD (premenstrual dysphoric disorder) is a condition affecting menstruating people, both from a psychological perspective and physical perspective. PMDD is characterized by a combination of mood and physical symptoms that occur during the luteal phase of the menstrual cycle, including depression, irritability, joint pain, breast pain, cravings, lethargy, and poor concentration, among others. The condition has had a rather turbulent path to being recognized, with some controversial involvement from big pharma (Moynihan and Cassels, 2005, as cited by [Schroll and Lauritsen, 2022](https://doi.org/10.1111/aogs.14360)). PMDD was first introduced into the DSM-III (Diagnostic and Statistical Manual of Mental Disorders, third edition) in 1987 under the name late luteal phase dysphoric disorder (LLPDD); however, after reassessing the symptoms reported by patients the diagnosis criteria was revised and the name premenstrual dysphoric disorder was coined in the DSM-IV in 1993. At this point, the condition was classified as a "Condition for further study", and in 2012 it was [revised in the DSM-5](https://www.ncbi.nlm.nih.gov/books/NBK519704/table/ch3.t24) edition under the class "Depressive Disorder". It wasn't until 2019 that PMDD was added to the ICD-11 under code [GA34.41](https://icd.who.int/browse/2024-01/mms/en#1526774088), granting the condition full medical recognition. 
 
 As a condition that encompasses both mental heath and the menstrual cycle, PMDD is a disorder that is not discussed widely, and people with PMDD may find a difficult time finding accurate information to educate themselves about the symptoms they may experience and their treatment options. In addition, given its relatively recent introduction to the ICD, the condition is not widely known among clinicians and physicians, so patients are commonly tasked with the responsibility to source literature to share with them to support their treatment, and often diagnosis.
 
-To facilitate visibility to PMDD scientific literature, this notebook conducts and exploratory data analysis of scientific literature on PMDD available in [PubMed](https://pubmed.ncbi.nlm.nih.gov/?term=pmdd+OR+premenstrual+dysphoric+disorder+OR+pmdd+%5BMESH%5D) using the search prompt `pmdd OR premenstrual dysphoric disorder OR pmdd [MESH]`. This notebook includes all the publications available until July 30, 2024 3:00 pm ET, with the goal of identifying insights and observations that can eventually be reported in a continuously updated dashboard. In addition, this notebook will explore how the scientific literature is cited across PMDD publications, to support the development of a web-app providing a visual map of the scientific literature supporting PMDD studies with the objective of promoting advocacy for research funding and facilitating collaboration among scientists. 
+To facilitate visibility to PMDD scientific literature, this notebook conducts and exploratory data analysis of scientific literature on PMDD available in [Pubmed](https://pubmed.ncbi.nlm.nih.gov/?term=pmdd+OR+premenstrual+dysphoric+disorder+OR+pmdd+%5BMESH%5D) using the search prompt `pmdd OR premenstrual dysphoric disorder OR pmdd [MESH]`. This notebook includes all code blocks used to promote transparency and encourage feedback, and the data explored includes all the publications available until July 30, 2024 3:00 pm ET, with the goal of identifying insights and observations that can eventually be reported in a continuously updated dashboard. In addition, this notebook will explore how the scientific literature is cited across PMDD publications, to support the development of a web-app providing a visual map of the scientific literature supporting PMDD studies with the objective of promoting advocacy for research funding and facilitating collaboration among scientists. 
 
 
 # Data input
 
-The data used in this analysis was all obtained from PubMed using [Entrez Direct: E-utilities on the Unix Command Line](https://www.ncbi.nlm.nih.gov/books/NBK179288/#chapter6.Structured_Data) with the search prompt `pmdd OR premenstrual dysphoric disorder OR pmdd [MESH]`. The data was obtained in an XML file, which was then converted to JSON using [yq](https://github.com/mikefarah/yq), and then loaded onto a local database using [DuckDB](https://duckdb.org/docs/api/r) (`pmdd.db`).
+The data used in this analysis was obtained from Pubmed using [Entrez Direct: E-utilities on the Unix Command Line](https://www.ncbi.nlm.nih.gov/books/NBK179288/#chapter6.Structured_Data) with the search prompt `pmdd OR premenstrual dysphoric disorder OR pmdd [MESH]`. The data was obtained in an XML file, which was parsed and extracted in the `pmdd_entrez.R` script using the `xml2` package to import the data into a data frame, and then does a bit of cleaning of the resulting data frame. The cleaned data frame is imported to the `pmdd.db` database as `entrez_clean_df`.
 
-This notebook will use a combination of [DuckDB](https://duckdb.org/docs/api/r) and [tidyverse](https://www.tidyverse.org) packages to process the data. to achieve that, let's first establish a connection to the `pmdd.db` database with the data imported from PubMed using `pmdd_entrez.sh`.Once connected to the database, the "entrez_clean" table including the modeled data obtained from Entrez is loaded into an R data frame. 
+
 
 ```{r}
 # Install packges
@@ -42,6 +42,7 @@ library(conflicted)
 library(rvest)
 library(httr)
 library(xml2)
+library(archive)
 
 conflicts_prefer(dplyr::filter)
 
@@ -58,6 +59,7 @@ con <- dbConnect(duckdb(), dbdir = database_path)
 
 # Get table from database and store in dataframe
 entrez_clean <- dbGetQuery(con, "SELECT * FROM entrez_clean;")
+pmc_filelist <- dbGetQuery(con, "SELECT * FROM pmc_filelist;")
 
 # Close connection to database
 duckdb_shutdown(duckdb())
@@ -66,12 +68,12 @@ duckdb_shutdown(duckdb())
 
 # Analysis and visualization
 
-The data obtained from PubMed includes the unique identifiers of a publication (e.g. PubMed ID, Pubmed Central ID, doi), title, author details (e.g. names, affiliation), article abstract, keywords, [MeSH](https://www.ncbi.nlm.nih.gov/mesh/) (Medical Subject Headings, established by the National Library of Medicine) terms and references. 
+The data obtained from Pubmed includes the unique identifiers of a publication (e.g. Pubmed ID, Pubmed Central ID, doi), title, author details (e.g. names, affiliation), article abstract, keywords, [MeSH](https://www.ncbi.nlm.nih.gov/mesh/) (Medical Subject Headings, established by the National Library of Medicine) terms and references. 
 
 
-## How many PMDD articles were published in PubMed each year?
+## How many PMDD articles were published in Pubmed each year?
 
-Multiple date fields are available in the raw data obtained from PubMed, including `accepted_date` and `pubdate`. When exploring the data, only 564 (~42%) out of the 1352 publications have a date in the `accepted_date` field. Therefore, the field `publication_year` was included in the SQL model in DuckDB, which extracts the year field from `pubdate` in the records where `accepted_date` is empty, but uses the year from `accepted_date` when available. This results in 1349 records out of 1352 reporting a publication year. 
+Multiple date fields are available in the raw data obtained from Pubmed, including `accepted_date` and `pubdate`. When exploring the data, only 564 (~42%) out of the 1352 publications have a date in the `accepted_date` field. Therefore, the field `publication_year` was included in the SQL model in DuckDB, which extracts the year field from `pubdate` in the records where `accepted_date` is empty, but uses the year from `accepted_date` when available. This results in 1349 records out of 1352 reporting a publication year. 
 
 ```{r}
 entrez_clean %>% 
@@ -80,7 +82,7 @@ entrez_clean %>%
             all = n_distinct(pubmed_id)
             )
 ```
-Therefore, the number of publications per year can be calculated by counting the unique PubMed IDs for each `publication_year`, stored in the `n_articles_year` data frame. 
+Therefore, the number of publications per year can be calculated by counting the unique Pubmed IDs for each `publication_year`, stored in the `n_articles_year` data frame. 
 
 ```{r}
 ## Get number of publications per year
@@ -108,7 +110,7 @@ n_articles_year %>%
             stdev = sd(articles))
 ```
 
-## How many keywords are used to describe PMDD articles on PubMed?
+## How many keywords are used to describe PMDD articles on Pubmed?
 
 Keywords are provided by authors when they submit their article for consideration to a journal. Therefore, they could serve as a good indicator of the kind of work reported on a scientific paper. Keywords are included in the `entrez_clean` table in a nested column named **keywords**, which must first be unnested to calculate how many keywords are used in PMDD publications. Additionally, it is common to find both a singular and plural version (e.g. "adolescent" and "adolescents") of the same keywords, as well as different capitalization (e.g. "pmdd" and "PMDD"). Therefore, before doing calculations based on keywords it is important to do a bit of cleaning of the data.
 
@@ -152,7 +154,7 @@ keywords <- entrez_clean %>%
   filter(!(keyword %in% c('n/a', 'null')))
 ```
 
-Up until the end of July 2024, a total of 1,236 unique keywords have been used in PMDD publications in PubMed, of which 609 (49%) were introduced before 2019, and 627 (51%) were introduced on 2019 or after. The use of more keywords after 2019 may be a consequence of a broader abundance of fields researching PMDD with the introduction of the condition to the ICD-11. To further explore this idea, the following sections look intowhich keywords were more predominantly used before and after 2019, as well as which keywords were introduced on or after 2019. 
+Up until the end of July 2024, a total of 1,236 unique keywords have been used in PMDD publications in Pubmed, of which 609 (49%) were introduced before 2019, and 627 (51%) were introduced on 2019 or after. The use of more keywords after 2019 may be a consequence of a broader abundance of fields researching PMDD with the introduction of the condition to the ICD-11. To further explore this idea, the following sections look intowhich keywords were more predominantly used before and after 2019, as well as which keywords were introduced on or after 2019. 
 
 ```{r}
 keywords %>% 
@@ -253,7 +255,7 @@ entrez_clean %>%
 
 ### What is the percentage of articles that use keywords?
 
-Out of the 1352 publications related to PMDD until the end of July 2024, 34.24% provide keywords in PubMed.
+Out of the 1352 publications related to PMDD until the end of July 2024, 34.24% provide keywords in Pubmed.
 
 ```{r}
 # Calculate the number of publications that use a keyword
@@ -266,64 +268,70 @@ entrez_clean %>%
             )
 ```
 
-About 66% of the articles extracted from PubMed include keywords. Interestingly, many of the publications that to not have keywords reported in PubMed do have them in PMC. Therefore, a potential future direction of this work could include extracting all the keywords from the PMC record in NCBI. However, Entrez does not have access to PMC keywords, so to get PMC data the [FTP](https://www.ncbi.nlm.nih.gov/pmc/tools/ftp/) service provided by NCBI will be used. 
+About 66% of the articles extracted from Pubmed include keywords. Interestingly, many of the publications that to not have keywords reported in Pubmed do have them in PMC. Therefore, a potential future direction of this work could include extracting all the keywords from the PMC record in NCBI. However, Entrez does not have access to PMC keywords, so to get PMC data the [FTP](https://www.ncbi.nlm.nih.gov/pmc/tools/ftp/) service provided by NCBI will be used. 
 
 
 #### Getting PMC keywords data (WIP)
 
-First, the file lists obtained from PMC were combined into a single CSV file to have all the information required. This was done in a separate R script named `pmc_filelist.R`.
+Data from PMC was then collected using NCBI's [FTP Service](https://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_bulk/) to comply with PMC's restrictions on bulk download. The data is distributed across ~200 compressed tar archives and individual filelist .csv files for each archive. These filelist records were combined into a single .csv file to have all the information required in a single table; this was done in a separate R script named `pmc_filelist.R`. 
 
-WIP...
+With all the filelist information combined, the tar archive including the PMC publications of interest were easily identified. A function was written to extract the keywords from the identified PMC files in their respective tar archives, which was applied to all the PMC IDs found in `entrez_clean` that do not have any keywords available, resulting in 149 IDs. 
 
+It is important to note that the FTP service does not include all PMC articles due to copyright restrictions. As such, only 59 of the identified PMC IDs were found in the data extracted from PMC.
 
+```{r, eval = FALSE}
 
-```{r, include = FALSE, eval = FALSE}
 # Get list of PMC IDs to extract keywords from 
 kws_pmc_ids <- entrez_clean %>% 
   filter(keywords %in% c('NULL', 'N/A')) %>% 
   select(pmc_id) %>% 
-  filter(!is.na(pmc_id)) %>% 
-  unique()
+  filter(nchar(pmc_id)>0) %>% 
+  unique() %>%  ###
+  left_join(pmc_filelist, join_by(pmc_id == AccessionID)) %>% 
+  select(pmc_id,
+         archive = archive,
+         path = Article.File) %>% 
+  mutate(archive = str_replace(archive, "filelist.csv", "tar.gz"))
+  
+
+# Write function "fun" that will extract the keywords from the PMC papers
+fun <- function(archive, path){
+  ssd <- "/Volumes/on_the_go/PMC/PMC_FTP/"
+  return(if(!is.na(path)){
+  if(length(xml_find_all(read_xml(archive_read(paste0( ssd, archive), path)), "//kwd") %>% xml_text())>0){
+                       xml_find_all(read_xml(archive_read(paste0(ssd, archive), path)), "//kwd") %>% xml_text()
+                     }else{
+                       "N/A"
+                     }
+  }else{"N/A"})
+}
 
 
-#kws_pmc_ids <- c("PMC5533120", "PMC5427117")
-
-# Function to get keywords from article XML
-pmc_kws <- purrr::map_df(kws_pmc_ids, function(id) {
-  return(data.frame(pmc_id = id, 
-                    keywords = xml_find_all(read_xml(paste0('/Volumes/Vault/PMC/PMC_files/', id, ".xml")), "//kwd") %>% xml_text()
-                      ))
-})
+# Extract keywords into kws_pmc_ids data frame
+kws_pmc_ids_new <- kws_pmc_ids %>%
+  #head(n=10) %>% 
+  filter(!is.na(path)) %>% 
+  mutate(keywords = map2(archive, path, fun)
+         )
 
 
 #------------------------------------------------
-# This function could have worked too, but I wanted to try map_df
-# Also, map_df required substantially fewer lines of code
+# # This function works too, but I would have to join this into the data frame in a second step
+# pmc_kws_2 <- purrr::map_dfr(kws_pmc_ids_2, function(id) {
+#    return(data.frame(pmc_id = id, 
+#                      keywords = if(length(xml_find_all(read_xml(archive_read("/Users/anaelizondo-ramos/Downloads/test/all_pmc.tar.gz", id)), "//kwd") %>% xml_text())>0){
+#                        xml_find_all(read_xml(archive_read("/Users/anaelizondo-ramos/Downloads/test/all_pmc.tar.gz", id)), "//kwd") %>% xml_text()
+#                      }else{
+#                        "N/A"
+#                      }
+#                        ))
+#  })
 
-# get_keywords <-  function(pmc_id) {
-#   #xml <- read_xml(paste0("/Volumes/Vault/PMC/PMC_files/", pmc_id))
-# 
-#   xml <- read_xml(paste0('/Users/anaelizondo-ramos/Downloads/test/oa_comm_xml.incr.2024-06-19/PMC005xxxxxx/',pmc_id, ".xml"))
-# 
-#   pmc_id <-  pmc_id
-# 
-#   if(length(xml_find_all(xml, "//kwd") %>% xml_text()) > 0){
-#     kw <- list(xml_find_all(xml, "//kwd") %>% xml_text())
-#   }else{
-#     kw <- 'N/A'
-#   }
-# 
-#   cbind(pmc_id=pmc_id, kw=kw)
-# }
-# 
-# pmc_kws <- as.data.frame(do.call("rbind", lapply(kws_pmc_ids, get_keywords)), stringsAsFactors = FALSE)
 #------------------------------------------------
-
-
-
-
 
 ```
+
+Only 22 out of the 150 identified papers include keywords. This corresponds to less than 2% of all the publications explored. Therefore, PMC keywords will not be included in this report. 
 
 
 ## How many MeSH terms are used to describe PMDD publications?
@@ -332,9 +340,9 @@ pmc_kws <- purrr::map_df(kws_pmc_ids, function(id) {
 
 MeSH terms are used in a similar way than keywords in the literature, but the categorization of whether or not a MeSH term is used in a paper depends on the definitions assigned by the National Library of Medicine (NLM). Therefore, the use of a MeSH term may be a bit more regulated than the use of an equivalent keyword. 
 
-Given the big overlap of the potential use of keywords and MeSH terms, the following blocks will look into whether MeSH terms should be used over keywords, or the other way around. However, before running any calculations using MeSH terms, it is important to note that the data obtained from PubMed indicates a "major MeSH" term or a general "MeSH term". For the analysis in this document, "major MeSH" is interpreted as the central topic of the paper, and the rest of the MeSH terms are considered more similar to keywords, indicating relevance to the study.
+Given the big overlap of the potential use of keywords and MeSH terms, the following blocks will look into whether MeSH terms should be used over keywords, or the other way around. However, before running any calculations using MeSH terms, it is important to note that the data obtained from Pubmed indicates a "major MeSH" term or a general "MeSH term". For the analysis in this document, "major MeSH" is interpreted as the central topic of the paper, and the rest of the MeSH terms are considered more similar to keywords, indicating relevance to the study.
 
-Since MeSH terms are established by the NLM, there is no need to focus on cleaning the list of MeSH terms obtained for the PMDD literature. After unnesting the fields storing the MeSH terms used in PMDD publications in PubMed, 398 major MeSH terms spanning over 1165 general MeSH terms are found providing a coverage of 43.9% of the PMDD publications using MeSH terms. 
+Since MeSH terms are established by the NLM, there is no need to focus on cleaning the list of MeSH terms obtained for the PMDD literature. After unnesting the fields storing the MeSH terms used in PMDD publications in Pubmed, 398 major MeSH terms spanning over 1165 general MeSH terms are found providing a coverage of 43.9% of the PMDD publications using MeSH terms. 
 
 
 ```{r}
@@ -441,7 +449,7 @@ More publications use MeSH terms than keywords (43.9% compared to 34.3% respecti
 
 ## How many institutions have published PMDD articles?
 
-Out of all data obtained from PubMed, the author affiliation field appears to be the most inconsistent, as it appears there is no common format on how to populate this field among journals. Some of the formats observed include:
+Out of all data obtained from Pubmed, the author affiliation field appears to be the most inconsistent, as it appears there is no common format on how to populate this field among journals. Some of the formats observed include:
 
 - `Department Name, Institution name, City, Country`, 
 
@@ -455,7 +463,7 @@ Therefore, the reported affiliations were split into individual components to ge
 universit, center, centre, clinic, institut, college
 ```
 
-While this does not include all the affiliations in the PMDD publications in the data obtained from PubMed, 1575 academic centers were identified across 2073 authors and 1115 unique publications, corresponding to ~82.7% of the PMDD publications to date. 
+While this does not include all the affiliations in the PMDD publications in the data obtained from Pubmed, 1575 academic centers were identified across 2073 authors and 1115 unique publications, corresponding to ~82.7% of the PMDD publications to date. 
 
 ```{r}
 
@@ -481,7 +489,7 @@ author_details %>%
 
 ### Which institution has been the most prolific in terms of PMDD publications?
 
-With a clean version of the author affiliations, the number of PMDD publications produced by each of the identified academic centers was calculated. Based on the terms selected to identify academic centers Uppsala University, University of California and McMaster University were found to be the top 3 academic centes with the most impact on PMDD literature.
+With a clean version of the author affiliations, the number of PMDD publications produced by each of the identified academic centers was calculated. Based on the terms selected to identify academic centers Uppsala University, University of California and McMaster University were found to be the top 3 academic centers with the most impact on PMDD literature.
 
 ```{r}
 # Calculate the number of publications by each academic center
@@ -515,6 +523,10 @@ head(n_articles_author, n=30)
 ```
 
 ## How many individual papers are referenced amongst the PMDD literature?
+
+
+A total of 22,959 references are identified, of which 1,672 are a PMDD publication. Notice that the count of PMDD references is higher than the total number of PMDD publications (1,352), indicating that multiple IDs for a single publication are being counted as individual references (e.g. pubmed_id and doi ID of a publication are counted as two unique references). Upon closer examination of the references section in Pubmed articles we find that it is common to have the pubmed_id reported in the reference along with another ID for the reference (i.e. pmc_id and/or doi).
+
 
 ```{r}
 # First let's get a list of all the PMDD publications and all the references used, identifying if the reference is one of the PMDD publications in our data
@@ -574,9 +586,32 @@ citations %>%
   group_by(publication_year, citation) %>% 
   summarize(cited_in = n_distinct(pubmed_id)) %>% 
   ggplot(., aes(x = publication_year, y = cited_in, fill = toupper(citation))) + geom_col(position = position_dodge()) + xlab("Publication Year") + ylab("Referenced in # of publications") + scale_fill_discrete(name = "ID") + theme(legend.position = "bottom") +
-  ggtitle("Top 5 most cited PMDD publications")
+  ggtitle("Top 5 most cited PMDD publications (among PMDD scientific literature")
 
 ```
-The graph above shows the top 5 most cited PMDD publications (among PMDD scientific literature).
 
 
+The way the citations are collected from Pubmed by the `pmdd_entrez.bash` make it difficult to group all the IDs corresponding to the same reference. This could be solved by modifying the `pmdd_entrez.bash` script to provide indexed references by ID type. However, since the second part of this project will focus on building a visual map of how publications are cited, it will become very useful to collect the entire list of Pubmed IDs will be collected in a separate script to ensure only one ID per reference is counted. Therefore, next steps of this project will include generating an additional table that will linclude all the IDs identified for all Pubmed publications and their references. 
+
+
+# Next steps
+
+This report was an exercise to get a better understanding of what is included in the PMDD publication data in Pubmed, as well as to explore where the data needs to be cleaned or grouped. The exploratory analysis conducted in this document provided some insights into the type of information that could be obtained from the PMDD publication data obtained from Pubmed to incorporate into a dashboard. 
+
+Based on this analysis, the selected insights to include in the dashboard are: 
+
+- Number of PMDD publications produced each year 
+- Number of publications reporting keywords 
+- Number of publications per keyword 
+- Number of times a publication is referenced 
+- Table with ID, title and abstract of a publication of interest 
+
+The insights above will be filterable by: 
+
+- Keyword(s) [OR]
+- Date of publication [range]
+- Author [AND]
+
+
+
+*Please note that the selected insights above are personal recommendations by the author. Please feel free to [submit an issue](https://github.com/aramos8/pmdd_pubmed/issues) to suggest any additional insights to include to the dashboard.* 
