@@ -25,6 +25,7 @@ xtract -set Set -rec Publication -pattern PubmedArticle -def "N/A" \
 		-if @MajorTopicYN -equals "Y" -pkg major_mesh -wrp major_mesh_term -element DescriptorName \
     -block MeshHeadingList -pkg mesh_terms -wrp mesh_term -element DescriptorName \
     -block KeywordList -pkg keywords -wrp keyword -element Keyword \
+    -block ChemicalList -pkg chemicals -wrp chemical -element NameOfSubstance \
 	-block Article -wrp title -element ArticleTitle \
 	-block Abstract -wrp abstract -element AbstractText \
 	-block AuthorList/Author -pkg authors \
