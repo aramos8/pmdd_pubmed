@@ -78,6 +78,13 @@ get_details <- function(id) {
   }else{
     keywords <- 'N/A'
   }
+
+  # chemicals
+  if(length(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/chemicals/chemical")) %>% xml_text()) > 0){
+    chemicals <- list(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/chemicals/chemical")) %>% xml_text())
+  }else{
+    chemicals <- 'N/A'
+  }
   
   # title
   if(length(xml_find_all(xml, paste("//Publication[pubmed_id=", id, "]/title")) %>% xml_text()) > 0){
@@ -134,6 +141,7 @@ get_details <- function(id) {
                       major_mesh=major_mesh,
                       mesh_terms=mesh_terms,
                       keywords=keywords,
+                      chemicals=chemicals,
                       title=title,
                       abstract=abstract,
                       authors=authors,
@@ -170,7 +178,7 @@ con <- dbConnect(duckdb(), dbdir = database_path)
 #on.exit(dbDisconnect(con), add = TRUE)
 
 # Register data frame as DuckDB table
-dbWriteTable(con, "entrez_clean_df", pmdd_entrez_clean_df)
+dbWriteTable(con, "stg_entrez_clean", pmdd_entrez_clean_df)
 
 # Close connection to database
 duckdb_shutdown(duckdb())

@@ -1,4 +1,4 @@
-CREATE OR REPLACE TABLE entrez_clean AS 
+CREATE OR REPLACE TABLE int_entrez_clean AS 
 WITH 
 authors_details_cte AS (
     SELECT DISTINCT
@@ -14,7 +14,7 @@ authors_details_cte AS (
                 authors,
                 UNNEST(authors) AS author_name,
                 UNNEST(author_affiliations) AS author_affiliation
-            FROM entrez_clean_df
+            FROM stg_entrez_clean
             )
         )
         GROUP BY pubmed_id
@@ -39,7 +39,7 @@ clean_abstract AS (
                     pubmed_id,
                     abstract,
                     UNNEST(abstract) AS abst
-                FROM entrez_clean_df
+                FROM stg_entrez_clean
                 )
             )
         )
@@ -54,21 +54,21 @@ clean_references AS (
         (SELECT DISTINCT
             pubmed_id,
             unnest.doi_references AS ref
-        FROM entrez_clean_df, UNNEST(doi_references)
+        FROM stg_entrez_clean, UNNEST(doi_references)
         
         UNION ALL 
 
         SELECT DISTINCT
             pubmed_id,
             unnest.pubmed_references AS ref
-        FROM entrez_clean_df, UNNEST(pubmed_references)
+        FROM stg_entrez_clean, UNNEST(pubmed_references)
 
         UNION ALL 
 
         SELECT DISTINCT
             pubmed_id,
             unnest.pmc_references AS ref
-        FROM entrez_clean_df, UNNEST(pmc_references)
+        FROM stg_entrez_clean, UNNEST(pmc_references)
         )
     GROUP BY pubmed_id
 )
@@ -85,6 +85,7 @@ SELECT DISTINCT
     major_mesh,
     mesh_terms,
     keywords,
+    chemicals,
     title,
     clean_abstract.abstract,
     author_details,
@@ -92,7 +93,7 @@ SELECT DISTINCT
     pubmed_references,
     doi_references,
     pmc_references
-FROM entrez_clean_df
+FROM stg_entrez_clean
 LEFT JOIN authors_details_cte
 USING(pubmed_id)
 LEFT JOIN clean_abstract
