@@ -4,8 +4,8 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(shiny)
-library(shinydashboard)
-library(fresh)      #https://github.com/dreamRs/fresh
+library(shinydashboard)   # https://github.com/uclahs-cds/package-VennDiagram
+library(fresh)            # https://github.com/dreamRs/fresh
 library(VennDiagram)
 library(conflicted)
 
@@ -53,6 +53,7 @@ mytheme <- create_theme(
   adminlte_global(
     content_bg = "#FFF",
     box_bg = "#D8DEE9", 
+    #box_bg = "#FDFFE5",
     info_box_bg = "#D8DEE9"
   )
 )  
@@ -78,21 +79,45 @@ ui <-
       
       use_theme(mytheme),
       
+      tags$h3("Objective"),
+      
+      p("The dashboard shows the most recent publications obtained from Pubmed, and it enables filtering of the search by three main 
+      categories: Drug Therapy, Non-Drug Therapy, and Symptoms. The goal of this dashboard is to help those affected by PMDD find scientific 
+      literature discussing symptoms and potential treatment options so that they can discuss these resources with their health care providers.") ,
+      
+      
       fluidRow(
         
-        box(plotOutput("pubs_year", height = 300)),
+        box(width = 9,
+            plotOutput("pubs_year", height = 300)
+            ),
         
-        box(plotOutput("keyterm_categories", height = 300))
-      
+        box(width = 3, 
+            plotOutput("keyterm_categories", height = 300)
+            )
         
       ),
+      
+      tags$h3("Use the filters below to find recent publications"),
+      
+
+      p("Keyterms are keywords, MeSH terms, and chemicals indicated by the publication authors. We have assigned these terms to the
+        three categories indicated above."),
+      
+      p('First, apply the', strong("Category"), 'filter, which will enable the keyterms in that category in the', strong("Keyterms"), 'filter'),
+      p('Once you have selected the', strong("Category"), 'you are interested in, the bar graph will show you the top 50 keyterms for the 
+        selected category (based on the number of publications using the keyterm). With the keyterm selected, you can find the publications using 
+        your selected keyterm in the table at the bottom of the dashboard. You will find the Pubmed ID (unique ID that Pubmed assigns to publications)
+        , title of the publication, the year when it was publised, and the abstract, which is the summary scientists provide for their article.'),
+      p(em("Please note that you can click on the PubmedId and it will take you to the article page in Pubmed")),
       
       fluidRow(
         column(width = 2,
                selectInput("categories_filter","Category",
                            choices = categories,
                            multiple = FALSE,
-                           selectize = TRUE
+                           selectize = TRUE,
+                           selected = "Non-Drug Therapy"
                            
                ),
                
@@ -100,18 +125,30 @@ ui <-
                selectInput("keyterms_filter","Keyterms",
                            choices = publications$keyterms$keyterm,
                            multiple = FALSE,
-                           selected = NULL
+                           selected = publications %>% 
+                             unnest(keyterms) %>% 
+                             filter(keyterm_category == "Non-Drug Therapy") %>% 
+                             group_by(keyterm) %>% 
+                             summarize(publications = n_distinct(pubmed_id, na.rm = TRUE)) %>%
+                             arrange(desc(publications)) %>% 
+                             head(1) %>% 
+                             pull(keyterm)
+                             
                )
         ),
         
         column(width = 10,
-               box(plotOutput("pubs_keyword", height = 600))
+               box(
+                 width = "100%",
+                 plotOutput("pubs_keyword", height = 600)
+                 )
         )
       ),
       
       fluidRow(
-        DT::dataTableOutput("table",
+        width = "100%", DT::dataTableOutput("table",
                             width = "100%")
+  
       )
     )
   )
@@ -138,9 +175,12 @@ server <- function(input, output, session) {
       summarize(articles = n_distinct(pubmed_id))
     
     ggplot(data = filter(n_articles_year, !is.na(publication_year))) +
-      geom_col(mapping = aes(x = publication_year, y = articles), fill = "#907C99") + 
+      geom_col(mapping = aes(x = publication_year, y = articles), fill = "#7A6085") + 
       xlab("Publication Year") +
-      ylab("Number of publications") 
+      ylab("Number of publications") +
+      theme_classic() +
+      theme(axis.text.x = element_text(size = 12),
+            axis.text.y = element_text(size = 12))
   })
   
   
@@ -163,20 +203,23 @@ server <- function(input, output, session) {
         ),
         category.names = c("Drug Therapy" , "Non-Drug Therapy" , "Symptoms"),
         filename = NULL,
+        disable.logging = TRUE,
         output = FALSE,
         height = "100%",
         width = "100%",
-        # resolution = 300,
-        # compression = "lzw",
+        cat.pos = c(-27, 27, 120),
+        cat.dist = c(0.055, 0.055, 0.06),
         lwd = 1,
-        col=c("#440154ff", '#21908dff', '#fde725ff'),
-        fill = c(alpha("#440154ff",0.3), alpha('#21908dff',0.3), alpha('#fde725ff',0.3)),
+        # col=c("#440154ff", '#21908dff', '#fde725ff'),
+        # fill = c(alpha("#440154ff",0.3), alpha('#21908dff',0.3), alpha('#fde725ff',0.3)),
+        col=c("#DA0E5B", '#08A072', '#E97807'),
+        fill = c(alpha("#DA0E5B",0.3), alpha('#08A072',0.3), alpha('#E97807',0.3)),
         cex = 0.8,
         fontfamily = "sans",
         cat.cex = 1,
         cat.default.pos = "outer",
         cat.fontfamily = "sans",
-        cat.col = c("#440154ff", '#21908dff', '#fde725ff'),
+        cat.col = c("#DA0E5B", '#08A072', '#E97807'),
         # rotation = 1
       )
     )
@@ -201,6 +244,7 @@ server <- function(input, output, session) {
       )
   })
   
+  # Explore this to apply filters: https://stackoverflow.com/questions/42742788/r-shiny-filter-for-all-values
   
   output$table <- DT::renderDataTable({
     DT::datatable(
@@ -216,7 +260,8 @@ server <- function(input, output, session) {
           PubmedID = sprintf(paste0("<a href= 'https://pubmed.ncbi.nlm.nih.gov/",pubmed_id,"/'>", pubmed_id, "</a>")),
           Title = title,
           Year = publication_year, 
-          Abstract = abstract),
+          Abstract = abstract) %>% 
+        arrange(desc(Year)),
       escape = FALSE)
   })
   
