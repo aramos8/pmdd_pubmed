@@ -79,10 +79,12 @@ ui <-
       
       use_theme(mytheme),
       
-      tags$h3("Objective"),
+      p(strong("Author"), tags$a(href="https://www.linkedin.com/in/ramos-ana/", "Ana Ramos.")),
+      
+      tags$h3("Goal"),
       
       p("The dashboard shows the most recent publications obtained from Pubmed, and it enables filtering of the search by three main 
-      categories: Drug Therapy, Non-Drug Therapy, and Symptoms. The goal of this dashboard is to help those affected by PMDD find scientific 
+      categories:", strong("Drug Therapy"), ",", strong("Non-Drug Therapy"),", and", strong("Symptoms"),". The goal of this dashboard is to help those affected by PMDD find scientific 
       literature discussing symptoms and potential treatment options so that they can discuss these resources with their health care providers.") ,
       
       
@@ -109,7 +111,7 @@ ui <-
         selected category (based on the number of publications using the keyterm). With the keyterm selected, you can find the publications using 
         your selected keyterm in the table at the bottom of the dashboard. You will find the Pubmed ID (unique ID that Pubmed assigns to publications)
         , title of the publication, the year when it was publised, and the abstract, which is the summary scientists provide for their article.'),
-      p(em("Please note that you can click on the PubmedId and it will take you to the article page in Pubmed")),
+
       
       fluidRow(
         column(width = 2,
@@ -145,11 +147,17 @@ ui <-
         )
       ),
       
+      
+      p(em("NOTE: you can click on the PubmedID and it will take you to the article page in Pubmed")),
+      
+      
       fluidRow(
         width = "100%", DT::dataTableOutput("table",
                             width = "100%")
   
-      )
+      ),
+      
+    p("Source code for this dashboard can be found", tags$a(href="https://github.com/aramos8/pmdd_pubmed/tree/main/scripts/dashboard", "here."))
     )
   )
 #)
@@ -213,7 +221,7 @@ server <- function(input, output, session) {
         # col=c("#440154ff", '#21908dff', '#fde725ff'),
         # fill = c(alpha("#440154ff",0.3), alpha('#21908dff',0.3), alpha('#fde725ff',0.3)),
         col=c("#DA0E5B", '#08A072', '#E97807'),
-        fill = c(alpha("#DA0E5B",0.3), alpha('#08A072',0.3), alpha('#E97807',0.3)),
+        fill = c(alpha("#DA0E5B",0.4), alpha('#08A072',0.4), alpha('#E97807',0.4)),
         cex = 0.8,
         fontfamily = "sans",
         cat.cex = 1,
