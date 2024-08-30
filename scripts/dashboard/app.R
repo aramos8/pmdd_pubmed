@@ -2,9 +2,11 @@ library(DBI)
 library(duckdb)
 library(tidyverse)
 library(dplyr)
-library(plotly)
+library(ggplot2)
 library(shiny)
 library(shinydashboard)
+library(fresh)      #https://github.com/dreamRs/fresh
+library(VennDiagram)
 library(conflicted)
 
 conflicts_prefer(dplyr::filter)
@@ -15,151 +17,207 @@ conflicts_prefer(shinydashboard::box)
 # Connect to DuckDB database
 
 database_path <- file.path('/Users', 'anaelizondo-ramos', 'Documents', 'Projects', 'pmdd', 'pmdd_pubmed',"data", "pmdd.db")
+#database_path <- file.path("pmdd_pubmed", "data", "pmdd.db")
 
 con <- dbConnect(duckdb(), dbdir = database_path)
 
-# Ensure databse connection is closed when closing this notebook
-#on.exit(dbDisconnect(con), add = TRUE)
-
-# or
-#con <- dbConnect(duckdb(), dbdir = ":memory:")
 
 # Get table from database and store in dataframe
-entrez_clean <- dbGetQuery(con, "SELECT * FROM entrez_clean;")
-#pmc_filelist <- dbGetQuery(con, "SELECT * FROM pmc_filelist;")
+publications <- dbGetQuery(con, "SELECT * FROM dim_publication_summary;")
+
 
 # Close connection to database
 dbDisconnect(con)
 
 
 
-#####------------------- Build data frames -------------------#####
+# Get categories for filter
+categories <- publications %>% 
+  unnest(keyterms) %>% 
+  pull(keyterm_category)
 
-# Number of PMDD publications produced each year 
-n_articles_year <- entrez_clean |>
-  group_by(publication_year) |>
-  summarize(articles = n_distinct(pubmed_id))
-
-# Number of publications reporting keywords 
-pubs_w_kwds <- entrez_clean %>% 
-  unnest(keywords) %>% 
-  filter(!(keywords %in% c('N/A', 'NULL'))) %>% 
-  summarize(with_kws_pubs_perc = round(n_distinct(pubmed_id, na.rm = FALSE)/n_distinct(entrez_clean$pubmed_id, na.rm = FALSE)*100, digits = 2),
-            no_kws_pubs_perc = 100 - with_kws_pubs_perc
-  ) %>% 
-  pivot_longer(cols = everything()
-               ) %>% 
-  select(name,
-         value) %>% 
-  mutate(name = case_when(name ==  "with_kws_pubs_perc" ~ "Publications with keywords",
-                            name == "no_kws_pubs_perc" ~ "Publications without keywords"))
-
-
-# Number of publications per keyword 
-## First we clean the keyword terms to consolidate singular/plural versions and capitalization versions.
-stg_kws <- entrez_clean %>% 
-  unnest(keywords) %>% 
-  transmute(keywords,
-            lower_kw = case_when(
-              grepl("premenstrual syndrome", keywords, ignore.case = TRUE) ~ "pms",  
-              grepl("PMDD/PMS|PMS/P", keywords, ignore.case = TRUE) ~ "pms/pmdd",  
-              grepl("pre-menstrual dysphoric disorder|premenstrual dysphoric disorder|premenstrual dysphoria disorder", keywords, ignore.case = TRUE) ~ "pmdd",
-              grepl("-", keywords) ~ keywords,
-              .default = tolower(keywords)),
-            singulars = stringr::str_replace_all(lower_kw, c("[^[:alnum:]]$" = "",  "s$" = "", "(\\(\\d*)" = "\\1\\)" ))
-  )
-
-## Now, we can use stg_kws to decide which term to use for the keyword.
-## If the singular form of the keyword is present in the lower-case version of the original keyword, then we use the singular form. If the singular version is not present in the original keyword then we keep the original. 
-keywords <- entrez_clean %>%
-  unnest(keywords) %>%
-  left_join(stg_kws, relationship = "many-to-many") %>%
-  group_by(keyword = case_when(
-    singulars %in% stg_kws$lower_kw ~ singulars, 
-    .default = lower_kw)) %>% 
-  summarize(publications = n_distinct(pubmed_id),
-            first_date = min(publication_year),
-            pubs_before_2019 = n_distinct(case_when(publication_year < 2019 ~ as.character(pubmed_id), .default = NA), na.rm = TRUE),
-            pubs_after_2019 = n_distinct(case_when(publication_year >= 2019 ~ as.character(pubmed_id), .default = NA), na.rm = TRUE)
-  ) %>% 
-  arrange(desc(publications)) %>% 
-  filter(!(keyword %in% c('n/a', 'null')))
-
-
-
-# Number of times a publication is referenced 
-# Table with ID, title and abstract of a publication of interest 
-
-
-
+categories <- c(as.character(unique(categories)))
 
 ###------------------- Dashboard -------------------###
 
-ui <- dashboardPage(
-  dashboardHeader(
-    title = "PMDD literature in Pubmed",
-    titleWidth = 450
+mytheme <- create_theme(
+  adminlte_color(
+    light_blue = "#434C5E"
+  ),
+  adminlte_sidebar(
+    width = "400px",
+    dark_bg = "#D8DEE9",
+    dark_hover_bg = "#81A1C1",
+    dark_color = "#2E3440"
+  ),
+  adminlte_global(
+    content_bg = "#FFF",
+    box_bg = "#D8DEE9", 
+    info_box_bg = "#D8DEE9"
+  )
+)  
+
+
+
+ui <- 
+  # page_fillable(
+  # 
+  # theme = bs_theme(version = 5, bootswatch = "flatly"),
+  # 
+  dashboardPage(
+    #skin = "purple",
+    
+    dashboardHeader(
+      title = "PMDD literature in Pubmed",
+      titleWidth = 450
     ),
-  
-  dashboardSidebar(disable = TRUE),
-  
-  dashboardBody(
-    # Boxes need to be put in a row (or column)
-    fluidRow(
+    
+    dashboardSidebar(disable = TRUE),
+    
+    dashboardBody(
       
-      box(plotOutput("pubs_year", height = 300)),
+      use_theme(mytheme),
       
-      box(plotOutput("pubs_w_kwds", height = 300)),
+      fluidRow(
+        
+        box(plotOutput("pubs_year", height = 300)),
+        
+        box(plotOutput("keyterm_categories", height = 300))
       
-      box(plotOutput("pubs_keyword", height = 300)),
-      
-      selectInput("keywords_filter","Keywords",
-                  choices = keywords$keyword,
-                  multiple = TRUE
+        
       ),
       
-      DT::dataTableOutput("table", width = "100%")
-
+      fluidRow(
+        column(width = 2,
+               selectInput("categories_filter","Category",
+                           choices = categories,
+                           multiple = FALSE,
+                           selectize = TRUE
+                           
+               ),
+               
+               # [OR] filter
+               selectInput("keyterms_filter","Keyterms",
+                           choices = publications$keyterms$keyterm,
+                           multiple = FALSE,
+                           selected = NULL
+               )
+        ),
+        
+        column(width = 10,
+               box(plotOutput("pubs_keyword", height = 600))
+        )
+      ),
+      
+      fluidRow(
+        DT::dataTableOutput("table",
+                            width = "100%")
+      )
     )
   )
-)
+#)
 
 
-
-server <- function(input, output) {
+server <- function(input, output, session) {
+  
+  ## Adapted from https://stackoverflow.com/questions/68084974/multiple-filters-shiny
+  observe({
+    pubs_k <- publications[publications$keyterms$keyterm_category %in% input$categories_filter,]
+    #if (is.null(input$categories_filter)) {selected_choices = ""
+    #}else if("All" %in% input$categories_filter) {selected_choices = publications$keyterms$keyterm
+    if (is.null(input$categories_filter)) {selected_choices = publications$keyterms$keyterm
+    }else selected_choices = unique(pubs_k$keyterms$keyterm)
+    
+    updateSelectInput(session, "keyterms_filter", choices = selected_choices)
+  })
+  
   ## Let's plot the publications per year
   output$pubs_year <- renderPlot({
+    n_articles_year <- publications |>
+      group_by(publication_year) |>
+      summarize(articles = n_distinct(pubmed_id))
+    
     ggplot(data = filter(n_articles_year, !is.na(publication_year))) +
-      geom_col(mapping = aes(x = publication_year, y = articles), fill = "#0072b2") + 
+      geom_col(mapping = aes(x = publication_year, y = articles), fill = "#907C99") + 
       xlab("Publication Year") +
       ylab("Number of publications") 
   })
   
-  output$pubs_w_kwds <- renderPlot({
-    # pie(pubs_w_kwds$value,
-    #     labels = c("Publications with keywords", "Publications without keywords"))
-    ggplot(data = pubs_w_kwds, aes(x="", y=value, fill=name)) +
-      geom_bar(stat="identity", width=1)+
-      coord_polar("y")+
-      theme_void()
+  
+  output$keyterm_categories <- renderPlot({
+    # categories <- publications %>% 
+    #   group_by(category = keyterms$keyterm_category) %>% 
+    #   summarize(keyterms = n_distinct(keyterms$keyterm, na.rm = TRUE))
+    # 
+    # ggplot(data = categories, aes(x="", y=keyterms, fill=category)) +
+    #   geom_bar(stat="identity", width=1)+
+    #   coord_polar("y")+
+    #   theme_void()
+    
+    grid.draw(
+      venn.diagram(
+        x = list(
+          publications %>% filter(keyterms$keyterm_category == "Drug Therapy") %>% select(pubmed_id) %>% unlist(), 
+          publications %>% filter(keyterms$keyterm_category == "Non-Drug Therapy") %>% select(pubmed_id) %>% unlist(),
+          publications %>% filter(keyterms$keyterm_category == "Symptoms") %>% select(pubmed_id) %>% unlist()
+        ),
+        category.names = c("Drug Therapy" , "Non-Drug Therapy" , "Symptoms"),
+        filename = NULL,
+        output = FALSE,
+        height = "100%",
+        width = "100%",
+        # resolution = 300,
+        # compression = "lzw",
+        lwd = 1,
+        col=c("#440154ff", '#21908dff', '#fde725ff'),
+        fill = c(alpha("#440154ff",0.3), alpha('#21908dff',0.3), alpha('#fde725ff',0.3)),
+        cex = 0.8,
+        fontfamily = "sans",
+        cat.cex = 1,
+        cat.default.pos = "outer",
+        cat.fontfamily = "sans",
+        cat.col = c("#440154ff", '#21908dff', '#fde725ff'),
+        # rotation = 1
+      )
+    )
+    
+    
   })
   
   output$pubs_keyword <- renderPlot({
-    ggplot(data = head(keywords, n=30), aes(x = fct_reorder(keyword, publications), y = publications) ) +
-      geom_col(fill = "#0072b2") +
+    n_articles_keyterm <- publications %>%
+      filter(keyterms$keyterm_category %in% coalesce(input$categories_filter, categories)) %>% 
+      group_by(keyterm = keyterms$keyterm) %>% 
+      summarize(articles = n_distinct(pubmed_id)) %>% 
+      arrange(desc(articles))
+    
+    ggplot(data = head(n_articles_keyterm, n=50), aes(x = fct_reorder(keyterm, articles), y = articles) ) +
+      geom_col(fill = "#907C99") +
       coord_flip() + scale_y_continuous(name="Number of publications") +
-      scale_x_discrete(name="Keyword")
+      scale_x_discrete(name="Keyterm") +
+      theme_classic() +
+      theme(axis.text.x = element_text(size = 12),
+            axis.text.y = element_text(size = 12)
+      )
   })
   
+  
   output$table <- DT::renderDataTable({
-    entrez_clean %>% 
-      #filter(lower(keywords) %in% input$keywords_filter) %>% 
-      select(pubmed_id,
-             pmc_id,
-             doi,
-             title,
-             abstract) %>% 
-      unique()
+    DT::datatable(
+      publications %>% 
+        unnest(keyterms) %>% 
+        # filter(keyterm_category %in% input$categories_filter) %>% 
+        # filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm)) %>% 
+        # {if (is.null(input$category_filter)) filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm))
+        #  else (keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm) & keyterm_category %in% input$categories_filter)} %>% 
+        filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm) & keyterm_category %in% input$categories_filter) %>% 
+        unique() %>% 
+        transmute(
+          PubmedID = sprintf(paste0("<a href= 'https://pubmed.ncbi.nlm.nih.gov/",pubmed_id,"/'>", pubmed_id, "</a>")),
+          Title = title,
+          Year = publication_year, 
+          Abstract = abstract),
+      escape = FALSE)
   })
   
 }
