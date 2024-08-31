@@ -4,10 +4,12 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(shiny)
-library(shinydashboard)   # https://github.com/uclahs-cds/package-VennDiagram
+library(shinydashboard)   
 library(fresh)            # https://github.com/dreamRs/fresh
-library(VennDiagram)
+library(VennDiagram)      # https://github.com/uclahs-cds/package-VennDiagram
+library(bsplus)           # https://stackoverflow.com/questions/76799976/how-to-make-accordion-type-side-bar-layout-in-shiny
 library(conflicted)
+
 
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(shinydashboard::box)
@@ -51,7 +53,8 @@ mytheme <- create_theme(
     dark_color = "#2E3440"
   ),
   adminlte_global(
-    content_bg = "#FFF",
+    #content_bg = "#FFF",
+    content_bg = "#F9F5F5",
     box_bg = "#D8DEE9", 
     #box_bg = "#FDFFE5",
     info_box_bg = "#D8DEE9"
@@ -81,24 +84,55 @@ ui <-
       
       p(strong("Author"), tags$a(href="https://www.linkedin.com/in/ramos-ana/", "Ana Ramos.")),
       
+      em("Last updated on", Sys.Date()),
+      
       tags$h3("Goal"),
       
       p("The dashboard shows the most recent publications obtained from Pubmed, and it enables filtering of the search by three main 
       categories:", strong("Drug Therapy"), ",", strong("Non-Drug Therapy"),", and", strong("Symptoms"),". The goal of this dashboard is to help those affected by PMDD find scientific 
-      literature discussing symptoms and potential treatment options so that they can discuss these resources with their health care providers.") ,
+      literature discussing symptoms and potential treatment options so that they can discuss these resources with their health care providers."),
+      
+      p("Suggested uses for this dashboard include:", 
+        tags$li("You or a loved one have just been diagnosed and want to learn more about PMDD"),
+        tags$li("You found some blogs or influencers recommending remmedies for PMDD and you want to fact-check their claims"),
+        tags$li("You want to find new treatment options to discuss with your health care provider"),
+        tags$li("You are noticing recurring symptoms during your luteal phase and want to explore if it has been linked to PMDD in scientific studies")
+        ),
       
       
-      fluidRow(
-        
-        box(width = 9,
-            plotOutput("pubs_year", height = 300)
+      bs_accordion(
+        id = "all_time"
+      )  |> 
+        bs_set_opts(
+          use_heading_link = T,
+          #panel_type = "default"
+          panel_type = "info"
+        ) |> 
+        bs_append(
+          title = "All time PMDD publications",
+          content = fluidRow(
+            
+            box(width = 9,
+                plotOutput("pubs_year", height = 300)
             ),
-        
-        box(width = 3, 
-            plotOutput("keyterm_categories", height = 300)
+            
+            box(width = 3, 
+                plotOutput("keyterm_categories", height = 300)
             )
-        
-      ),
+           )
+        ),
+      
+      # fluidRow(
+      #   
+      #   box(width = 9,
+      #       plotOutput("pubs_year", height = 300)
+      #       ),
+      #   
+      #   box(width = 3, 
+      #       plotOutput("keyterm_categories", height = 300)
+      #       )
+      #   
+      # ),
       
       tags$h3("Use the filters below to find recent publications"),
       
@@ -216,7 +250,7 @@ server <- function(input, output, session) {
         height = "100%",
         width = "100%",
         cat.pos = c(-27, 27, 120),
-        cat.dist = c(0.055, 0.055, 0.06),
+        cat.dist = c(0.055, 0.055, 0.07),
         lwd = 1,
         # col=c("#440154ff", '#21908dff', '#fde725ff'),
         # fill = c(alpha("#440154ff",0.3), alpha('#21908dff',0.3), alpha('#fde725ff',0.3)),
