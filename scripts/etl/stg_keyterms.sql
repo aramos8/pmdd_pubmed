@@ -1,4 +1,4 @@
--- This query pulls all the keywords, MeSH terms and chemicals from entrez_clean and creates a new list of keyterms
+-- This query pulls all the keywords, MeSH terms and chemicals from int_entrez_clean and creates a new list of keyterms
 
 CREATE OR REPLACE TABLE stg_keyterms AS 
 
@@ -13,14 +13,30 @@ WITH unnest AS (
             WHEN LOWER(UNNEST(keywords)) LIKE '%drug therapy%' THEN 'Drug Therapy'
             WHEN LOWER(UNNEST(keywords)) LIKE '%pharmacotherapy%' THEN 'Drug Therapy'
             WHEN LOWER(UNNEST(keywords)) LIKE '%hormone%therapy' THEN 'Drug Therapy'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%estrogen%therapy' THEN 'Drug Therapy'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%chemotherapy%' THEN 'Drug Therapy'
             WHEN LOWER(UNNEST(keywords)) LIKE '%phytotherapy%' THEN 'Drug Therapy'
             WHEN LOWER(UNNEST(keywords)) LIKE '%radiotherapy%' THEN 'Drug Therapy'
             WHEN LOWER(UNNEST(keywords)) LIKE '%exercise%' THEN 'Non-Drug Therapy'
             WHEN LOWER(UNNEST(keywords)) LIKE '%therapy%' THEN 'Non-Drug Therapy'
             WHEN LOWER(UNNEST(keywords)) LIKE '%stimulation%' THEN 'Non-Drug Therapy'
             WHEN LOWER(UNNEST(keywords)) LIKE '%symptom%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%food crav%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%depression%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%dizz%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%headache%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%irritab%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%anxiety%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%sleep%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%pain%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%fatigue%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%impuls%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%dysmenorrhea%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%negativ%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE '%memory%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(keywords)) LIKE 'suicid%' THEN 'Symptoms'
         END AS keyterm_category
-    FROM entrez_clean
+    FROM int_entrez_clean
 
     UNION ALL 
 
@@ -32,14 +48,30 @@ WITH unnest AS (
             WHEN LOWER(UNNEST(mesh_terms)) LIKE '%drug therapy%' THEN 'Drug Therapy'
             WHEN LOWER(UNNEST(mesh_terms)) LIKE '%pharmacotherapy%' THEN 'Drug Therapy'
             WHEN LOWER(UNNEST(mesh_terms)) LIKE '%hormone%therapy' THEN 'Drug Therapy'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%estrogen%therapy' THEN 'Drug Therapy'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%chemotherapy%' THEN 'Drug Therapy'
             WHEN LOWER(UNNEST(mesh_terms)) LIKE '%phytotherapy%' THEN 'Drug Therapy'
             WHEN LOWER(UNNEST(mesh_terms)) LIKE '%radiotherapy%' THEN 'Drug Therapy'
             WHEN LOWER(UNNEST(mesh_terms)) LIKE '%exercise%' THEN 'Non-Drug Therapy'
             WHEN LOWER(UNNEST(mesh_terms)) LIKE '%therapy%' THEN 'Non-Drug Therapy'
             WHEN LOWER(UNNEST(mesh_terms)) LIKE '%stimulation%' THEN 'Non-Drug Therapy'
             WHEN LOWER(UNNEST(mesh_terms)) LIKE '%symptom%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%food crav%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%depression%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%dizz%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%headache%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%irritab%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%anxiety%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%sleep%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%pain%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%fatigue%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%impuls%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%dysmenorrhea%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%negativ%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE '%memory%' THEN 'Symptoms'
+            WHEN LOWER(UNNEST(mesh_terms)) LIKE 'suicid%' THEN 'Symptoms'
         END AS keyterm_category
-    FROM entrez_clean
+    FROM int_entrez_clean
 
     UNION ALL 
 
@@ -48,7 +80,7 @@ WITH unnest AS (
         UNNEST(chemicals) AS keyterm,
         regexp_replace(UNNEST(chemicals), 's$', '') AS singular_keyterm,
         CASE WHEN UNNEST(chemicals) != 'N/A' THEN 'Drug Therapy' END AS keyterm_category
-    FROM entrez_clean
+    FROM int_entrez_clean
 ),
 
 clean_1 AS (
