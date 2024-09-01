@@ -94,7 +94,7 @@ ui <-
       
       p("Suggested uses for this dashboard include:", 
         tags$li("You or a loved one have just been diagnosed and want to learn more about PMDD"),
-        tags$li("You found some blogs or influencers recommending remmedies for PMDD and you want to fact-check their claims"),
+        tags$li("You found some resources online recommending remedies for PMDD and you want to fact-check their claims"),
         tags$li("You want to find new treatment options to discuss with your health care provider"),
         tags$li("You are noticing recurring symptoms during your luteal phase and want to explore if it has been linked to PMDD in scientific studies")
         ),
@@ -143,8 +143,8 @@ ui <-
       p('First, apply the', strong("Category"), 'filter, which will enable the keyterms in that category in the', strong("Keyterms"), 'filter'),
       p('Once you have selected the', strong("Category"), 'you are interested in, the bar graph will show you the top 50 keyterms for the 
         selected category (based on the number of publications using the keyterm). With the keyterm selected, you can find the publications using 
-        your selected keyterm in the table at the bottom of the dashboard. You will find the Pubmed ID (unique ID that Pubmed assigns to publications)
-        , title of the publication, the year when it was publised, and the abstract, which is the summary scientists provide for their article.'),
+        your selected keyterm in the table at the bottom of the dashboard. You will find the Pubmed ID (unique ID that Pubmed assigns to publications), 
+        title of the publication, the year when it was published, and the abstract, which is the summary scientists provide for their article.'),
 
       
       fluidRow(

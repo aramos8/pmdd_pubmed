@@ -6,18 +6,20 @@ output:
     theme:
       # version: 4
       # bootswatch: minty
-      bg: "#101010"
-      fg: "#FDF7F7"
-      primary: "#ED79F9"
-      base_font:
-        google: Prompt
-      code_font:
-        google: JetBrains Mono
+      bg: "#F9F5F5"
+      fg: "#2E3440"
+      primary: "#434C5E"
+      base_font: "Helvetica"
+        #google: Prompt
     orientation: rows
     vertical_layout: scroll
+    navbar:
+        - { icon: "fa-github", href: "https://github.com/aramos8", align: right}
+        - { icon: "fa-linkedin", href: "(https://www.linkedin.com/in/ramos-ana/", align: right}
 runtime: shiny
 ---
 
+```{=html}
 <style>
 .dataTables_scrollBody {
     height:600px !important;
@@ -27,20 +29,27 @@ runtime: shiny
     overflow:auto !important;
 }
 </style>
-
+```
+```{=html}
+<style type="text/css">
+  li {font-size: 12px;}
+</style>
+```
+*Last updated on `r format(Sys.time(), '%d %B, %Y')`*
 
 ```{r setup, include=FALSE}
 library(flexdashboard)
 library(shinydashboard)
-library(jsonlite)
 library(DBI)
 library(duckdb)
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
+library(ggplotify)
 library(shiny)
 library(fresh)            # https://github.com/dreamRs/fresh
 library(VennDiagram)      # https://github.com/uclahs-cds/package-VennDiagram
+library(ggvenn)
 library(bsplus)           # https://stackoverflow.com/questions/76799976/how-to-make-accordion-type-side-bar-layout-in-shiny
 library(conflicted)
 
@@ -72,24 +81,37 @@ categories <- publications %>%
 categories <- c(as.character(unique(categories)))
 ```
 
+## Column {.tabset .tabset-fade}
 
-```{r, inlcude = FALSE}
-# Server functions
+### **Goal**
 
+```{r}
+HTML('
+      <div style="margin-bottom:0; padding-bottom:0":>
+      <p>The dashboard shows the most recent publications obtained from Pubmed, and it enables filtering of the search by three main categories: <b>Drug Therapy</b>, <b>Non-Drug Therapy</b>, and <b>Symptoms</b>. The goal of this dashboard is to help those affected by PMDD find scientific literature discussing symptoms and potential treatment options so that they can discuss these resources with their health care providers.</p>
+            
+      <p> Suggested uses for this dashboard include: </p>
+      <ul>
+        <li> You or a loved one have just been diagnosed and want to learn more about PMDD </li>
+        <li> You found some resources online recommending remedies for PMDD and you want to fact-check their claims </li>
+        <li> You want to find new treatment options to discuss with your health care provider </li>
+        <li> You are noticing recurring symptoms during your luteal phase and want to explore if it has been linked to PMDD in scientific studies </li>
+      </ul>
+      </div>
+     ')
 
-## Adapted from https://stackoverflow.com/questions/68084974/multiple-filters-shiny
-  observe({
-    pubs_k <- publications[publications$keyterms$keyterm_category %in% input$categories_filter,]
-    #if (is.null(input$categories_filter)) {selected_choices = ""
-    #}else if("All" %in% input$categories_filter) {selected_choices = publications$keyterms$keyterm
-    if (is.null(input$categories_filter)) {selected_choices = publications$keyterms$keyterm
-    }else selected_choices = unique(pubs_k$keyterms$keyterm)
-    
-    updateSelectInput(session, "keyterms_filter", choices = selected_choices)
-  })
-  
+```
 
-  ## Let's plot the publications per year
+### **All time PMDD publications in Pubmed**
+
+```{r}
+
+fillRow(height = 300, flex = c(2.5, 1), 
+  plotOutput("pubs_year"),
+  plotOutput("keyterm_categories")
+)
+
+## Let's plot the publications per year
   output$pubs_year <- renderPlot({
     n_articles_year <- publications |>
       group_by(publication_year) |>
@@ -101,107 +123,52 @@ categories <- c(as.character(unique(categories)))
       ylab("Number of publications") +
       theme_classic() +
       theme(axis.text.x = element_text(size = 12),
-            axis.text.y = element_text(size = 12))
+            axis.text.y = element_text(size = 12),
+            plot.background = element_rect(fill = '#F9F5F5', color = '#F9F5F5'),
+            panel.background = element_blank())
+            
+            #panel.background = element_blank())
   })
   
+  
+
   # Venn diagram of categories
-  output$keyterm_categories <- renderPlot({
 
-    grid.draw(
-      venn.diagram(
-        x = list(
-          publications %>% filter(keyterms$keyterm_category == "Drug Therapy") %>% select(pubmed_id) %>% unlist(), 
-          publications %>% filter(keyterms$keyterm_category == "Non-Drug Therapy") %>% select(pubmed_id) %>% unlist(),
-          publications %>% filter(keyterms$keyterm_category == "Symptoms") %>% select(pubmed_id) %>% unlist()
-        ),
-        category.names = c("Drug Therapy" , "Non-Drug Therapy" , "Symptoms"),
-        filename = NULL,
-        disable.logging = TRUE,
-        output = FALSE,
-        height = "100%",
-        width = "100%",
-        cat.pos = c(-27, 27, 120),
-        cat.dist = c(0.055, 0.055, 0.07),
-        lwd = 1,
-        # col=c("#440154ff", '#21908dff', '#fde725ff'),
-        # fill = c(alpha("#440154ff",0.3), alpha('#21908dff',0.3), alpha('#fde725ff',0.3)),
-        col=c("#DA0E5B", '#08A072', '#E97807'),
-        fill = c(alpha("#DA0E5B",0.4), alpha('#08A072',0.4), alpha('#E97807',0.4)),
-        cex = 0.8,
-        fontfamily = "sans",
-        cat.cex = 1,
-        cat.default.pos = "outer",
-        cat.fontfamily = "sans",
-        cat.col = c("#DA0E5B", '#08A072', '#E97807'),
-        # rotation = 1
-      )
-    )
-    
+  output$keyterm_categories <- renderPlot({  
+    x <- list(
+          A = publications %>% filter(keyterms$keyterm_category == "Drug Therapy") %>% pull(pubmed_id) %>% unlist(), 
+          B = publications %>% filter(keyterms$keyterm_category == "Non-Drug Therapy") %>% pull(pubmed_id) %>% unlist(),
+          C = publications %>% filter(keyterms$keyterm_category == "Symptoms") %>% pull(pubmed_id) %>% unlist()
+        )
+    names(x) <-  c("Drug Therapy" , "Non-Drug Therapy" , "Symptoms")
+    ggvenn(
+      x,
+      fill_color = c("#440154ff", '#21908dff', '#fde725ff'),
+      stroke_size = 0,
+      #stroke_color = "#F9F5F5",
+      set_name_size = 5
+      
+      ) + 
+      scale_x_continuous() +
+      scale_y_continuous() +
+      theme(plot.background = element_rect(fill = '#F9F5F5', color = '#F9F5F5'),
+            panel.background = element_rect(fill = '#F9F5F5', color = '#F9F5F5')
+            )
+
   })
-  
-  
-  # Bar graphs of publications per keyterm
-  output$pubs_keyword <- renderPlot({
-    n_articles_keyterm <- publications %>%
-      filter(keyterms$keyterm_category %in% coalesce(input$categories_filter, categories)) %>% 
-      group_by(keyterm = keyterms$keyterm) %>% 
-      summarize(articles = n_distinct(pubmed_id)) %>% 
-      arrange(desc(articles))
-    
-    ggplot(data = head(n_articles_keyterm, n=50), aes(x = fct_reorder(keyterm, articles), y = articles) ) +
-      geom_col(fill = "#907C99") +
-      coord_flip() + scale_y_continuous(name="Number of publications") +
-      scale_x_discrete(name="Keyterm") +
-      theme_classic() +
-      theme(axis.text.x = element_text(size = 12),
-            axis.text.y = element_text(size = 12)
-      )
-  })
-  
-  
-  # Publication summary table
-  output$table <- DT::renderDataTable({   # Explore this to apply filters: https://stackoverflow.com/questions/42742788/r-shiny-filter-for-all-values
-    DT::datatable(
-      publications %>% 
-        unnest(keyterms) %>% 
-        # filter(keyterm_category %in% input$categories_filter) %>% 
-        # filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm)) %>% 
-        # {if (is.null(input$category_filter)) filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm))
-        #  else (keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm) & keyterm_category %in% input$categories_filter)} %>% 
-        filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm) & keyterm_category %in% input$categories_filter) %>% 
-        unique() %>% 
-        transmute(
-          PubmedID = sprintf(paste0("<a href= 'https://pubmed.ncbi.nlm.nih.gov/",pubmed_id,"/'>", pubmed_id, "</a>")),
-          Title = title,
-          Year = publication_year, 
-          Abstract = abstract) %>% 
-        arrange(desc(Year)),
-      escape = FALSE)
-  })
-```
-
-Historical Data
-=======================================================================
-Row 
------------------------------------------------------------------------
-
-### All time PMDD publications in Pubmed
-
-```{r}
-
-fillRow(height = 300, flex = c(2, 1), 
-  plotOutput("pubs_year", height = 300),
-  plotOutput("keyterm_categories", height = 300)
-)
 
 ```
 
-<!-- Publications -->
-<!-- ======================================================================= -->
-Row 
------------------------------------------------------------------------
+## Row
 
-### Filter PMDD publications by keyterm
+### **Filter PMDD publications by keyterm**
+
+Use the filters below to find recent publications Keyterms are keywords, [MeSH terms](https://www.ncbi.nlm.nih.gov/mesh/), and chemicals indicated by the publication authors. We have assigned these terms to the three categories indicated above.
+
+First, apply the **Category** filter, which will enable the keyterms in that category in the **Keyterms** filter
+
+Once you have selected the Category you are interested in, the bar graph will show you the top 50 keyterms for the selected category (based on the number of publications using the keyterm). With the keyterm selected, you can find the publications using your selected keyterm in the table at the bottom of the dashboard. You will find the Pubmed ID (unique ID that Pubmed assigns to publications), title of the publication, the year when it was published, and the abstract, which is the summary scientists provide for their article.
+
 ```{r}
 
 fillRow(height = 600, flex = c(1, 3),
@@ -232,13 +199,65 @@ inputPanel(
   plotOutput("pubs_keyword", height = 500)
 )
 
+## Adapted from https://stackoverflow.com/questions/68084974/multiple-filters-shiny
+  observe({
+    pubs_k <- publications[publications$keyterms$keyterm_category %in% input$categories_filter,]
+    #if (is.null(input$categories_filter)) {selected_choices = ""
+    #}else if("All" %in% input$categories_filter) {selected_choices = publications$keyterms$keyterm
+    if (is.null(input$categories_filter)) {selected_choices = publications$keyterms$keyterm
+    }else selected_choices = unique(pubs_k$keyterms$keyterm)
+    
+    updateSelectInput(session, "keyterms_filter", choices = selected_choices)
+  })
+  
+  
+  # Bar graphs of publications per keyterm
+  output$pubs_keyword <- renderPlot({
+    n_articles_keyterm <- publications %>%
+      filter(keyterms$keyterm_category %in% coalesce(input$categories_filter, categories)) %>% 
+      group_by(keyterm = keyterms$keyterm) %>% 
+      summarize(articles = n_distinct(pubmed_id)) %>% 
+      arrange(desc(articles))
+    
+    ggplot(data = head(n_articles_keyterm, n=50), aes(x = fct_reorder(keyterm, articles), y = articles) ) +
+      geom_col(fill = "#907C99") +
+      coord_flip() + scale_y_continuous(name="Number of publications") +
+      scale_x_discrete(name="Keyterm") +
+      theme_classic() +
+      theme(axis.text.x = element_text(size = 12),
+            axis.text.y = element_text(size = 12),
+            plot.background = element_rect(fill = '#F9F5F5', color = '#F9F5F5'),
+            panel.background = element_blank()
+      )
+  })
+
 ```
 
-Row 
------------------------------------------------------------------------
+## Row
 
 ```{r}
 fillRow(height = 600, 
    DT::dataTableOutput("table", width = "100%")
 )
+
+  
+  # Publication summary table
+  output$table <- DT::renderDataTable({   # Explore this to apply filters: https://stackoverflow.com/questions/42742788/r-shiny-filter-for-all-values
+    DT::datatable(
+      publications %>% 
+        unnest(keyterms) %>% 
+        # filter(keyterm_category %in% input$categories_filter) %>% 
+        # filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm)) %>% 
+        # {if (is.null(input$category_filter)) filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm))
+        #  else (keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm) & keyterm_category %in% input$categories_filter)} %>% 
+        filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm) & keyterm_category %in% input$categories_filter) %>% 
+        unique() %>% 
+        transmute(
+          PubmedID = sprintf(paste0("<a href= 'https://pubmed.ncbi.nlm.nih.gov/",pubmed_id,"/'>", pubmed_id, "</a>")),
+          Title = title,
+          Year = publication_year, 
+          Abstract = abstract) %>% 
+        arrange(desc(Year)),
+      escape = FALSE)
+  })
 ```
