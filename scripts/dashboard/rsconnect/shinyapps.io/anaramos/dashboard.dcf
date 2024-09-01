@@ -1,0 +1,13 @@
+name: dashboard
+title: dashboard
+username: anaramos
+account: anaramos
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 12577018
+bundleId: 9050190
+url: https://anaramos.shinyapps.io/dashboard/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .RData|pmdd_flex_dashboard.Rmd|Untitled.Rmd
