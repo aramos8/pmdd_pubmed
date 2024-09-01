@@ -3,7 +3,7 @@ Title: PMDD publications flexdashboard
 Version: 0.0.0.9000
 Authors@R: 
     person("Ana", "Ramos", , "anaramos.data@gmail.com", role = c("aut", "cre"))
-Description: Builds dashboard with PMDD data from Pubmed
+Description: "Builds dashboard with PMDD data from Pubmed"
 License: MIT + file license
 Imports:
     flexdashboard
