@@ -1,5 +1,3 @@
-library(DBI)
-library(duckdb)
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
@@ -15,27 +13,12 @@ conflicts_prefer(dplyr::filter)
 conflicts_prefer(shinydashboard::box)
 
 
-####------------------- Pool data from database -------------------#####
-# Connect to DuckDB database
+# ####------------------- Pool data from database -------------------#####
 
-database_path <- file.path('/Users', 'anaelizondo-ramos', 'Documents', 'Projects', 'pmdd', 'pmdd_pubmed',"data", "pmdd.db")
-#database_path <- file.path("pmdd_pubmed", "data", "pmdd.db")
-
-con <- dbConnect(duckdb(), dbdir = database_path)
-
-
-# Get table from database and store in dataframe
-publications <- dbGetQuery(con, "SELECT * FROM dim_publication_summary;")
-
-
-# Close connection to database
-dbDisconnect(con)
-
-
+publications <- read_csv("dim_publication_summary.csv")
 
 # Get categories for filter
 categories <- publications %>% 
-  unnest(keyterms) %>% 
   pull(keyterm_category)
 
 categories <- c(as.character(unique(categories)))
@@ -64,12 +47,8 @@ mytheme <- create_theme(
 
 
 ui <- 
-  # page_fillable(
-  # 
-  # theme = bs_theme(version = 5, bootswatch = "flatly"),
-  # 
+
   dashboardPage(
-    #skin = "purple",
     
     dashboardHeader(
       title = "PMDD literature in Pubmed",
@@ -122,18 +101,6 @@ ui <-
            )
         ),
       
-      # fluidRow(
-      #   
-      #   box(width = 9,
-      #       plotOutput("pubs_year", height = 300)
-      #       ),
-      #   
-      #   box(width = 3, 
-      #       plotOutput("keyterm_categories", height = 300)
-      #       )
-      #   
-      # ),
-      
       tags$h3("Use the filters below to find recent publications"),
       
 
@@ -157,12 +124,11 @@ ui <-
                            
                ),
                
-               # [OR] filter
                selectInput("keyterms_filter","Keyterms",
                            choices = publications$keyterms$keyterm,
                            multiple = FALSE,
                            selected = publications %>% 
-                             unnest(keyterms) %>% 
+                             #unnest(keyterms) %>% 
                              filter(keyterm_category == "Non-Drug Therapy") %>% 
                              group_by(keyterm) %>% 
                              summarize(publications = n_distinct(pubmed_id, na.rm = TRUE)) %>%
@@ -201,19 +167,17 @@ server <- function(input, output, session) {
   
   ## Adapted from https://stackoverflow.com/questions/68084974/multiple-filters-shiny
   observe({
-    pubs_k <- publications[publications$keyterms$keyterm_category %in% input$categories_filter,]
-    #if (is.null(input$categories_filter)) {selected_choices = ""
-    #}else if("All" %in% input$categories_filter) {selected_choices = publications$keyterms$keyterm
-    if (is.null(input$categories_filter)) {selected_choices = publications$keyterms$keyterm
-    }else selected_choices = unique(pubs_k$keyterms$keyterm)
+    pubs_k <- publications[publications$keyterm_category %in% input$categories_filter,]
+    if (is.null(input$categories_filter)) {selected_choices = publications$keyterm
+    }else selected_choices = unique(pubs_k$keyterm)
     
     updateSelectInput(session, "keyterms_filter", choices = selected_choices)
   })
   
   ## Let's plot the publications per year
   output$pubs_year <- renderPlot({
-    n_articles_year <- publications |>
-      group_by(publication_year) |>
+    n_articles_year <- publications %>% 
+      group_by(publication_year) %>% 
       summarize(articles = n_distinct(pubmed_id))
     
     ggplot(data = filter(n_articles_year, !is.na(publication_year))) +
@@ -227,21 +191,13 @@ server <- function(input, output, session) {
   
   
   output$keyterm_categories <- renderPlot({
-    # categories <- publications %>% 
-    #   group_by(category = keyterms$keyterm_category) %>% 
-    #   summarize(keyterms = n_distinct(keyterms$keyterm, na.rm = TRUE))
-    # 
-    # ggplot(data = categories, aes(x="", y=keyterms, fill=category)) +
-    #   geom_bar(stat="identity", width=1)+
-    #   coord_polar("y")+
-    #   theme_void()
     
     grid.draw(
       venn.diagram(
         x = list(
-          publications %>% filter(keyterms$keyterm_category == "Drug Therapy") %>% select(pubmed_id) %>% unlist(), 
-          publications %>% filter(keyterms$keyterm_category == "Non-Drug Therapy") %>% select(pubmed_id) %>% unlist(),
-          publications %>% filter(keyterms$keyterm_category == "Symptoms") %>% select(pubmed_id) %>% unlist()
+          publications %>% filter(keyterm_category == "Drug Therapy") %>% select(pubmed_id) %>% unlist(), 
+          publications %>% filter(keyterm_category == "Non-Drug Therapy") %>% select(pubmed_id) %>% unlist(),
+          publications %>% filter(keyterm_category == "Symptoms") %>% select(pubmed_id) %>% unlist()
         ),
         category.names = c("Drug Therapy" , "Non-Drug Therapy" , "Symptoms"),
         filename = NULL,
@@ -252,16 +208,14 @@ server <- function(input, output, session) {
         cat.pos = c(-27, 27, 120),
         cat.dist = c(0.055, 0.055, 0.07),
         lwd = 1,
-        # col=c("#440154ff", '#21908dff', '#fde725ff'),
-        # fill = c(alpha("#440154ff",0.3), alpha('#21908dff',0.3), alpha('#fde725ff',0.3)),
-        col=c("#DA0E5B", '#08A072', '#E97807'),
-        fill = c(alpha("#DA0E5B",0.4), alpha('#08A072',0.4), alpha('#E97807',0.4)),
+        col=c("#440154ff", '#21908dff', '#fde725ff'),
+        fill = c(alpha("#440154ff",0.5), alpha('#21908dff',0.5), alpha('#fde725ff',0.5)),
         cex = 0.8,
         fontfamily = "sans",
         cat.cex = 1,
         cat.default.pos = "outer",
         cat.fontfamily = "sans",
-        cat.col = c("#DA0E5B", '#08A072', '#E97807'),
+        cat.col = c("#440154ff", '#21908dff', '#fde725ff'),
         # rotation = 1
       )
     )
@@ -271,8 +225,8 @@ server <- function(input, output, session) {
   
   output$pubs_keyword <- renderPlot({
     n_articles_keyterm <- publications %>%
-      filter(keyterms$keyterm_category %in% coalesce(input$categories_filter, categories)) %>% 
-      group_by(keyterm = keyterms$keyterm) %>% 
+      filter(keyterm_category %in% coalesce(input$categories_filter, categories)) %>% 
+      group_by(keyterm = keyterm) %>% 
       summarize(articles = n_distinct(pubmed_id)) %>% 
       arrange(desc(articles))
     
@@ -291,12 +245,7 @@ server <- function(input, output, session) {
   output$table <- DT::renderDataTable({
     DT::datatable(
       publications %>% 
-        unnest(keyterms) %>% 
-        # filter(keyterm_category %in% input$categories_filter) %>% 
-        # filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm)) %>% 
-        # {if (is.null(input$category_filter)) filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm))
-        #  else (keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm) & keyterm_category %in% input$categories_filter)} %>% 
-        filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterms$keyterm) & keyterm_category %in% input$categories_filter) %>% 
+        filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterm) & keyterm_category %in% input$categories_filter) %>% 
         unique() %>% 
         transmute(
           PubmedID = sprintf(paste0("<a href= 'https://pubmed.ncbi.nlm.nih.gov/",pubmed_id,"/'>", pubmed_id, "</a>")),
