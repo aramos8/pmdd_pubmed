@@ -9,8 +9,14 @@ SELECT
     title,
     CASE WHEN abstract = 'N/A' THEN 'Not available' ELSE abstract END AS abstract,
     publication_year,
-    STRUCT_PACK(stg_keyterms.keyterm, stg_keyterms.keyterm_category) AS keyterms
+    stg_keyterms.keyterm, 
+    stg_keyterms.keyterm_category
 FROM int_entrez_clean
 LEFT JOIN stg_keyterms
 USING(pubmed_id)
 ORDER BY pubmed_id;
+
+
+.mode csv
+.output scripts/dashboard/dim_publication_summary.csv
+FROM dim_publication_summary;
