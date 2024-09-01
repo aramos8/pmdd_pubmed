@@ -6,3 +6,4 @@ data/pmdd.db
 .Rhistory
 .vscode/*
 .Rproj.user
+*.Rproj
