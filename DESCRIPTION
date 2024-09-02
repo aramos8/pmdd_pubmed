@@ -1,23 +1,25 @@
 Package: pmdd_pubmed
-Title: PMDD publications flexdashboard
+Title: What the Package Does (One Line, Title Case)
 Version: 0.0.0.9000
 Authors@R: 
-    person("Ana", "Ramos", , "anaramos.data@gmail.com", role = c("aut", "cre"))
-Description: "Builds dashboard with PMDD data from Pubmed"
-License: MIT + file license
-Imports:
-    flexdashboard
-    shinydashboard
-    tidyverse
-    dplyr
-    ggplot2
-    ggplotify
-    shiny
-    fresh
-    VennDiagram
-    ggvenn
-    bsplus
-    conflicted
+    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: What the package does (one paragraph).
+License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
+    license
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
+Imports: 
+    bsplus,
+    conflicted,
+    dplyr,
+    flexdashboard,
+    fresh,
+    ggplot2,
+    ggplotify,
+    ggvenn,
+    readr,
+    shiny,
+    shinydashboard,
+    VennDiagram
