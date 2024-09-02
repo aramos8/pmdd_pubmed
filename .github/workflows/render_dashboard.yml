@@ -18,7 +18,7 @@ jobs:
           use-public-rspm: true
       - name: Render and commit dashboard
         run: |
-          Rscript -e 'install.packages(c("bsplus", "conflicted", "dplyr", "flexdashboard", "fresh", "ggplot2", "ggplotify", "ggvenn", "shiny", "shinydashboard", "tidyverse", "VennDiagram"))'
+          Rscript -e 'install.packages(c("bsplus", "conflicted", "dplyr", "DT", "flexdashboard", "fresh", "ggplot2", "ggplotify", "ggvenn", "shiny", "shinydashboard", "tidyverse", "VennDiagram"))'
           Rscript -e "rmarkdown::render('scripts/dashboard/pmdd_flex_dashboard.Rmd', output_file = 'index.html')"
           git config --local user.name "$GITHUB_ACTOR"
           git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
