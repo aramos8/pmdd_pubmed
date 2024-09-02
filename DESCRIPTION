@@ -19,7 +19,8 @@ Imports:
     ggplot2,
     ggplotify,
     ggvenn,
-    readr,
     shiny,
     shinydashboard,
     VennDiagram
+Depends: 
+    tidyverse
