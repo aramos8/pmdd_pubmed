@@ -7,3 +7,4 @@ data/pmdd.db
 .vscode/*
 .Rproj.user
 *.Rproj
+.Rbuildignore
