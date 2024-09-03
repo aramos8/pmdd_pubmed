@@ -3,7 +3,7 @@
 #
 # Basic example of a GitHub Actions workflow that builds a Shiny app and deploys
 # it to GitHub Pages.
-name: name: deploy_rshinyapp
+name: deploy_rshinyapp
 
 on:
   # Manually trigger the workflow
