@@ -1,14 +1,17 @@
 # PMDD Publications in Pubmed
 
-This project builds a dashboard with a summary of the scientific publications available for PMDD research. The dashboard is currently hosted in https://anaramos.shinyapps.io/pmdd_pubmed/
+This project builds a dashboard with a summary of the scientific publications available for PMDD research. 
 
-However, a `flexdashboard` version has been built as well and will be deployed on GitHub pages as well. 
+The dashboard is currently hosted in https://anaramos.shinyapps.io/pmdd_pubmed/, and it will be hosted in GitHub pages (currently exploring why serverless deployment using `shinylive` is not working).
+
 
 ## To Do
 
-- Investigate why `pmdd_flex_dashboard.Rmd` is not rendering
-- Update colors in dashboard
+- Update pipeline to use Pubmed data from FTP pull instead of Entrez
+- Look into [GitHub Action](https://github.com/posit-dev/r-shinylive) not building app in GitHub Pages
+- Build Snakemake pipeline
 - Add citation details to dashboard
+- Update colors in dashboard
 
 
 
