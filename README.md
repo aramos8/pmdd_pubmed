@@ -7,7 +7,7 @@ The dashboard is currently hosted in https://anaramos.shinyapps.io/pmdd_pubmed/,
 
 ## To Do
 
-- Update pipeline to use Pubmed data from FTP pull instead of Entrez
+- Update pipeline to use Pubmed data from their FTP service to get citation data
 - Look into [GitHub Action](https://github.com/posit-dev/r-shinylive) not building app in GitHub Pages
 - Build Snakemake pipeline
 - Add citation details to dashboard
