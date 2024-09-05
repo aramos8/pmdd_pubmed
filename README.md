@@ -1,8 +1,10 @@
+[![deploy_rshinyapp](https://github.com/aramos8/pmdd_pubmed/actions/workflows/deploy_rshinyapp.yml/badge.svg)](https://github.com/aramos8/pmdd_pubmed/actions/workflows/deploy_rshinyapp.yml)
+
 # PMDD Publications in Pubmed
 
 This project builds a dashboard with a summary of the scientific publications available for PMDD research. 
 
-The dashboard is currently hosted in https://anaramos.shinyapps.io/pmdd_pubmed/, and it will be hosted in GitHub pages (currently exploring why serverless deployment using `shinylive` is not working).
+The dashboard is currently hosted in [shinyapps.io](https://anaramos.shinyapps.io/pmdd_pubmed/), and [GitHub pages](https://aramos8.github.io/pmdd_pubmed/) (using `shinylive`).
 
 
 ## To Do
