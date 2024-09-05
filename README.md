@@ -7,9 +7,8 @@ The dashboard is currently hosted in https://anaramos.shinyapps.io/pmdd_pubmed/,
 
 ## To Do
 
-- Look into [GitHub Action](https://github.com/posit-dev/r-shinylive) not building app in GitHub Pages
-- Update pipeline to use Pubmed data from their FTP service to get citation data
 - Build Snakemake pipeline
+- Update pipeline to use Pubmed data from their FTP service to get citation data
 - Add citation details to dashboard
 - Update colors in dashboard
 
