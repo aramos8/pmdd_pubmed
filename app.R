@@ -16,10 +16,11 @@ conflicts_prefer(shinydashboard::box)
 
 # ####------------------- Pool data from database -------------------#####
 
-publications <- read_csv("scripts/dashboard/dim_publication_summary.csv")
+publications <- read_csv("scripts/dashboard/dim_publication_summary.csv", show_col_types = FALSE)
 
 # Get categories for filter
 categories <- publications %>% 
+  filter(!is.na(keyterm_category)) %>% 
   pull(keyterm_category)
 
 categories <- c(as.character(unique(categories)))
@@ -67,11 +68,11 @@ card(tabsetPanel(
   tabPanel("All time PMDD publications in Pubmed",
            fluidRow(
              
-             box(width = 9,
+             shinydashboard::box(width = 9,
                  plotOutput("pubs_year", height = 300)
              ),
              
-             box(width = 3, 
+             shinydashboard::box(width = 3, 
                  plotOutput("keyterm_categories", height = 300)
              )
            )
@@ -102,10 +103,9 @@ fluidRow(
          ),
          
          selectInput("keyterms_filter","Keyterms",
-                     choices = publications$keyterms$keyterm,
+                     choices = publications$keyterm,
                      multiple = FALSE,
                      selected = publications %>% 
-                       #unnest(keyterms) %>% 
                        filter(keyterm_category == "Non-Drug Therapy") %>% 
                        group_by(keyterm) %>% 
                        summarize(publications = n_distinct(pubmed_id, na.rm = TRUE)) %>%
