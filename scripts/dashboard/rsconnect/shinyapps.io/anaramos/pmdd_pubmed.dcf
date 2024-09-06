@@ -5,7 +5,7 @@ account: anaramos
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 12576795
-bundleId: 9057822
+bundleId: 9070856
 url: https://anaramos.shinyapps.io/pmdd_pubmed/
 version: 1
 asMultiple: FALSE

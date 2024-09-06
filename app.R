@@ -55,7 +55,7 @@ p("
 card(tabsetPanel(
   tabPanel("Goal",
            p("The dashboard shows the most recent publications obtained from Pubmed, and it enables filtering of the search by three main 
-    categories:", strong("Drug Therapy"), ",", strong("Non-Drug Therapy"),", and", strong("Symptoms"),". The goal of this dashboard is to help those affected by PMDD find scientific 
+    categories:", strong("Drug Therapy, "), strong("Non-Drug Therapy, "),"and", strong("Symptoms."),"The goal of this dashboard is to help those affected by PMDD find scientific 
     literature discussing symptoms and potential treatment options so that they can discuss these resources with their health care providers."),
            
            p("Suggested uses for this dashboard include:", 
@@ -105,13 +105,7 @@ fluidRow(
          selectInput("keyterms_filter","Keyterms",
                      choices = publications$keyterm,
                      multiple = FALSE,
-                     selected = publications %>% 
-                       filter(keyterm_category == "Non-Drug Therapy") %>% 
-                       group_by(keyterm) %>% 
-                       summarize(publications = n_distinct(pubmed_id, na.rm = TRUE)) %>%
-                       arrange(desc(publications)) %>% 
-                       head(1) %>% 
-                       pull(keyterm)
+                     selected = "All"
                      
          )
   ),
@@ -143,12 +137,14 @@ server <- function(input, output, session) {
   
   ## Adapted from https://stackoverflow.com/questions/68084974/multiple-filters-shiny
   observe({
-    pubs_k <- publications[publications$keyterm_category %in% input$categories_filter,]
+    pubs_k <- publications[publications$keyterm_category %in% input$categories_filter,] %>% 
+      arrange(keyterm)
     if (is.null(input$categories_filter)) {selected_choices = publications$keyterm
-    }else selected_choices = unique(pubs_k$keyterm)
+    }else selected_choices = c("All", unique(pubs_k$keyterm))
     
     updateSelectInput(session, "keyterms_filter", choices = selected_choices)
   })
+  
   
   ## Let's plot the publications per year
   output$pubs_year <- renderPlot({
@@ -210,7 +206,10 @@ server <- function(input, output, session) {
   output$table <- DT::renderDataTable({
     DT::datatable(
       publications %>% 
-        filter(keyterm %in% coalesce(input$keyterms_filter, publications$keyterm) & keyterm_category %in% input$categories_filter) %>% 
+        filter(
+        if ("All" %in% input$keyterms_filter) {keyterm_category %in% input$categories_filter}
+          else keyterm %in% input$keyterms_filter
+        )%>% 
         unique() %>% 
         transmute(
           PubmedID = sprintf(paste0("<a href= 'https://pubmed.ncbi.nlm.nih.gov/",pubmed_id,"/' target='_blank'>", pubmed_id, "</a>")),
