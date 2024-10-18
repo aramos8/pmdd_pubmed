@@ -6,13 +6,20 @@ This project builds a dashboard with a summary of the scientific publications av
 
 The dashboard is currently hosted in [shinyapps.io](https://anaramos.shinyapps.io/pmdd_pubmed/), and [GitHub pages](https://aramos8.github.io/pmdd_pubmed/) (using `shinylive`).
 
+*NOTE: The dashboard hosted in GitHub Pages can take a couple of minutes to load. Also, there have been cases where Safari on desktop does not load the dashboard properly. If that is the case please try another browser. Alternatively, the dashboard hosted on shinyapps.io should always load properly.*
+
 
 ## To Do
 
 - Build Snakemake pipeline
+- Update dashboard to load faster
 - Update pipeline to use Pubmed data from their FTP service to get citation data
 - Add citation details to dashboard
 - Update colors in dashboard
+
+## Future directions
+
+- Identify -omics data and link it to available publications. 
 
 
 

@@ -1,6 +1,7 @@
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
+library(plotly)
 library(shiny)
 library(shinydashboard)
 library(ggvenn)
@@ -45,7 +46,7 @@ ui <-fluidPage(
     tags$a(href="https://www.linkedin.com/in/ramos-ana/", icon("linkedin"), target ="_blank"),
     tags$a(href="https://github.com/aramos8", icon("github"), target ="_blank")),
   
-  p(em("Last updated on", Sys.Date())),
+  p(em("Last updated on October 18, 2024")),
   
   p("
     
@@ -69,7 +70,7 @@ ui <-fluidPage(
              fluidRow(
                
                shinydashboard::box(width = 9,
-                                   plotOutput("pubs_year", height = 300)
+                                   plotlyOutput("pubs_year", height = 300)
                ),
                
                shinydashboard::box(width = 3, 
@@ -113,7 +114,7 @@ ui <-fluidPage(
     column(width = 10,
            box(
              width = "100%",
-             plotOutput("pubs_keyword", height = 600)
+             plotlyOutput("pubs_keyword", height = 600)
            )
     )
   ),
@@ -147,18 +148,21 @@ server <- function(input, output, session) {
   
   
   ## Let's plot the publications per year
-  output$pubs_year <- renderPlot({
+  output$pubs_year <- renderPlotly({
     n_articles_year <- publications %>% 
       group_by(publication_year) %>% 
       summarize(articles = n_distinct(pubmed_id))
     
+    ggplotly(
     ggplot(data = filter(n_articles_year, !is.na(publication_year))) +
-      geom_col(mapping = aes(x = publication_year, y = articles), fill = "#7A6085") + 
+      geom_col(mapping = aes(x = publication_year, y = articles, text = paste(articles, "publications in", publication_year)), fill = "#7A6085") + 
       xlab("Publication Year") +
       ylab("Number of publications") +
       theme_classic() +
       theme(axis.text.x = element_text(size = 12),
             axis.text.y = element_text(size = 12))
+    , tooltip = c("text")
+    )
   })
   
   
@@ -184,21 +188,23 @@ server <- function(input, output, session) {
     
   })
   
-  output$pubs_keyword <- renderPlot({
+  output$pubs_keyword <- renderPlotly({
     n_articles_keyterm <- publications %>%
       filter(keyterm_category %in% coalesce(input$categories_filter, categories)) %>% 
       group_by(keyterm = keyterm) %>% 
       summarize(articles = n_distinct(pubmed_id)) %>% 
       arrange(desc(articles))
     
-    ggplot(data = head(n_articles_keyterm, n=50), aes(x = fct_reorder(keyterm, articles), y = articles) ) +
+    ggplotly(
+    ggplot(data = head(n_articles_keyterm, n=50), aes(x = fct_reorder(keyterm, articles), y = articles, text = paste(articles, "publications on", fct_reorder(keyterm, articles))) ) +
       geom_col(fill = "#7A6085") +
       coord_flip() + scale_y_continuous(name="Number of publications") +
       scale_x_discrete(name="Keyterm") +
       theme_classic() +
       theme(axis.text.x = element_text(size = 12),
-            axis.text.y = element_text(size = 12)
-      )
+            axis.text.y = element_text(size = 12))
+    , tooltip = c("text")
+    )
   })
   
   # Explore this to apply filters: https://stackoverflow.com/questions/42742788/r-shiny-filter-for-all-values
