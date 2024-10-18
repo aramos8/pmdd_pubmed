@@ -11,6 +11,8 @@ The dashboard is currently hosted in [shinyapps.io](https://anaramos.shinyapps.i
 
 ## To Do
 
+- Clean keyterms
+    - New terms after updating data are not falling in the right category (e.g. "25-OH vitamin D" in "Other")
 - Build Snakemake pipeline
 - Update dashboard to load faster
 - Update pipeline to use Pubmed data from their FTP service to get citation data
