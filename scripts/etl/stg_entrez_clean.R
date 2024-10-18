@@ -178,7 +178,7 @@ con <- dbConnect(duckdb(), dbdir = database_path)
 #on.exit(dbDisconnect(con), add = TRUE)
 
 # Register data frame as DuckDB table
-dbWriteTable(con, "stg_entrez_clean", pmdd_entrez_clean_df)
+dbWriteTable(con, "stg_entrez_clean", pmdd_entrez_clean_df, append = TRUE)
 
 # Close connection to database
 duckdb_shutdown(duckdb())

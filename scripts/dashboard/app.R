@@ -114,7 +114,7 @@ ui <-fluidPage(
     column(width = 10,
            box(
              width = "100%",
-             plotlyOutput("pubs_keyword", height = 600)
+             plotlyOutput("pubs_keyword", height = 700)
            )
     )
   ),
