@@ -46,7 +46,7 @@ ui <-fluidPage(
     tags$a(href="https://www.linkedin.com/in/ramos-ana/", icon("linkedin"), target ="_blank"),
     tags$a(href="https://github.com/aramos8", icon("github"), target ="_blank")),
   
-  p(em("Last updated on October 18, 2024")),
+  p(em("Last updated on October 19, 2024")),
   
   p("
     
@@ -221,7 +221,8 @@ server <- function(input, output, session) {
           PubmedID = sprintf(paste0("<a href= 'https://pubmed.ncbi.nlm.nih.gov/",pubmed_id,"/' target='_blank'>", pubmed_id, "</a>")),
           Title = title,
           Year = publication_year, 
-          Abstract = abstract) %>% 
+          Abstract = abstract) %>%
+        unique() %>%  
         arrange(desc(Year)),
       escape = FALSE)
   })

@@ -46,7 +46,7 @@ ui <-fluidPage(
     tags$a(href="https://www.linkedin.com/in/ramos-ana/", icon("linkedin"), target ="_blank"),
     tags$a(href="https://github.com/aramos8", icon("github"), target ="_blank")),
   
-  p(em("Last updated on October 18, 2024")),
+  p(em("Last updated on October 19, 2024")),
   
   p("
     
@@ -222,6 +222,7 @@ server <- function(input, output, session) {
           Title = title,
           Year = publication_year, 
           Abstract = abstract) %>% 
+        unique() %>% 
         arrange(desc(Year)),
       escape = FALSE)
   })
