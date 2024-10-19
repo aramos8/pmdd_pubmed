@@ -88,7 +88,7 @@ clean_1 AS (
         pubmed_id,
         keyterm,
         CASE 
-            WHEN LOWER(singular_keyterm) IN (SELECT DISTINCT LOWER(keyterm) FROM stg_keyterms) THEN singular_keyterm
+            WHEN LOWER(singular_keyterm) IN (SELECT DISTINCT LOWER(keyterm) FROM unnest) THEN singular_keyterm
             ELSE keyterm
         END AS keyterm_clean
     FROM unnest
