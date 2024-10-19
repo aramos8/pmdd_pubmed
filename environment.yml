@@ -6,4 +6,18 @@ channels:
 dependencies:
   - snakemake==8.23.2
   - duckdb==0.10.2
+  - r-xml2
+  - r-tidyverse
+  - r-dbi
+  - r-duckdb
+  - r-dplyr
+  - r-ggplot2
+  - r-plotly
+  - r-shiny
+  - r-shinydashboard
+  - r-ggvenn
+  - r-bsplus
+  - r-conflicted
+  - r-bslib
+
   
