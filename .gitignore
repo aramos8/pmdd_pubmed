@@ -8,3 +8,4 @@ data/pmdd.db
 .Rproj.user
 *.Rproj
 .Rbuildignore
+.snakemake/*

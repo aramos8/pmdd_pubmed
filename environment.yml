@@ -1,0 +1,9 @@
+name: pmdd_venv
+channels:
+  - conda-forge
+  - base
+  - bioconda
+dependencies:
+  - snakemake==8.23.2
+  - duckdb==0.10.2
+  
