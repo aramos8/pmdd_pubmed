@@ -20,12 +20,11 @@ Please note that the `environment.yml` file does not include any of the R packag
 
 ## To Do
 
-- Clean keyterms
-    - New terms after updating data are not falling in the right category (e.g. "25-OH vitamin D" in "Other")
 - Update dashboard to load faster
 - Update pipeline to use Pubmed data from their FTP service to get citation data
 - Add citation details to dashboard
-- Update colors in dashboard
+- Explore using LLAMA or other open-source LLMs to build knowledge graph from abstracts
+
 
 
 
