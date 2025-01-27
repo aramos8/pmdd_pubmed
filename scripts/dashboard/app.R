@@ -46,7 +46,7 @@ ui <-fluidPage(
     tags$a(href="https://www.linkedin.com/in/ramos-ana/", icon("linkedin"), target ="_blank"),
     tags$a(href="https://github.com/aramos8", icon("github"), target ="_blank")),
   
-  p(em("Last updated on December 4, 2024")),
+  p(em("Last updated on January 27, 2025")),
   
   p("
     
